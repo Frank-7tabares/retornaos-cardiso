@@ -1,0 +1,151 @@
+// Prisma Schema para RetornaOS (PostgreSQL)
+// Reemplaza los archivos Excel de Vendedores (Z01-Z15) y Puntos de Venta / Clientes Z14
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN       // Gerencia y Auditoría Global (% DE VENTAS, Precios, Ventas Mes)
+  CALIDAD     // Auditor de Calidad / Planta (Lotes, Vacío, Lechoso, Abombamiento, Fecha)
+  RECEPCION   // Liquidador de Bodega (Captura y Conciliación Diaria)
+  VENDEDOR    // Ejecutivo Comercial de Ruta (Z01..Z15) - restringido a su zona
+  PDV         // Punto de Venta (Belén, Bello, Cumbre, Carla, Sabaneta) - restringido a su sede
+}
+
+enum AccountStatus {
+  PENDIENTE_APROBACION
+  ACTIVO
+  SUSPENDIDO
+}
+
+enum ZoneType {
+  RUTA_VENDEDOR
+  CLIENTE_ESPECIAL_Z14
+  PUNTO_DE_VENTA
+}
+
+enum MovementType {
+  AVERIA_DEVOLUCION
+  CAMBIO_FACTURA
+  DEGUSTACION
+  REINGRESO_BUENO
+}
+
+enum ReconciliationStatus {
+  CUADRADO
+  REVISAR
+  JUSTIFICADO_NO_AVERIA
+}
+
+model User {
+  id             String        @id @default(uuid())
+  email          String        @unique
+  passwordHash   String        // Argon2id hash
+  fullName       String
+  role           UserRole      @default(VENDEDOR)
+  status         AccountStatus @default(PENDIENTE_APROBACION)
+  assignedZoneId String?
+  assignedZone   Zone?         @relation("CurrentZoneUsers", fields: [assignedZoneId], references: [id])
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  returnItemsCreated ReturnItem[]
+  auditLogs          AuditLog[]
+}
+
+model Zone {
+  id               String   @id @default(uuid())
+  code             String   @unique // Ej: Z01, Z02..Z15, Z14-FRONTINO, PDV-BELEN, PDV-SABANETA
+  consolidatedName String   // Nombre oficial en % DE VENTAS
+  legacySheetName  String?  // Nombre histórico de pestaña Excel
+  type             ZoneType @default(RUTA_VENDEDOR)
+  active           Boolean  @default(true)
+  createdAt        DateTime @default(now())
+
+  users        User[]             @relation("CurrentZoneUsers")
+  monthlySales MonthlyZoneSales[]
+  returnItems  ReturnItem[]
+}
+
+model MonthlyZoneSales {
+  id              String   @id @default(uuid())
+  zoneId          String
+  zone            Zone     @relation(fields: [zoneId], references: [id])
+  year            Int      // Ej: 2026
+  month           Int      // Ej: 10 (Octubre)
+  monthlySalesCOP Decimal  @db.Decimal(14, 2) // Columna VENTAS MES en % DE VENTAS
+
+  @@unique([zoneId, year, month])
+}
+
+model Product {
+  id           String   @id @default(uuid())
+  sku          String   @unique // Str Id Producto (1000..1280)
+  name         String   @unique // Str Descripcion normalizada (sin dobles espacios)
+  category     String
+  price2024COP Int      // Int Precio5 vigente (LISTA PDTOS 2024)
+  pricePrevCOP Int      // Precio histórico (LISTA PDTOS HASTA 15)
+  active       Boolean  @default(true)
+  updatedAt    DateTime @updatedAt
+
+  returnItems ReturnItem[]
+}
+
+model ReturnItem {
+  id                String               @id @default(uuid())
+  returnDate        DateTime             @db.Date // Col A: FECHA
+  zoneId            String
+  zone              Zone                 @relation(fields: [zoneId], references: [id])
+  clientName        String               // Col B: CLIENTE
+  productId         String
+  product           Product              @relation(fields: [productId], references: [id])
+  qtyToReceive      Int                  // Col D: CANTIDAD A RECIBIR
+  lotNumber         String               // Col E: LOTE
+  productExpiryDate DateTime?            @db.Date // Col F: FECHA PDTO
+
+  // Las 7 Causas de Devolución en Unidades (Cols G a M)
+  qtyACobrar    Int @default(0) // Col G: A COBRAR (Comercial)
+  qtyXFecha     Int @default(0) // Col H: X FECHA (Calidad)
+  qtyVacio      Int @default(0) // Col I: VACIO (Calidad)
+  qtyProxVencer Int @default(0) // Col J: PR/V (Comercial)
+  qtyVencido    Int @default(0) // Col K: VENCIDO (Comercial)
+  qtyAbomba     Int @default(0) // Col L: ABOMBA (Calidad)
+  qtyLechozo    Int @default(0) // Col M: LECHOZO (Calidad)
+
+  // Campos calculados y snapshot financiero (Cols N, O y Ocultas Q a W)
+  totalClassifiedUnits Int                  // Col N: =SUM(G:M)
+  unitCostSnapshotCOP  Int                  // Col O: COSTO / PDTO congelado al día del registro
+  reconciliationStatus ReconciliationStatus // Col P: Validador separado de observaciones
+
+  movementType MovementType @default(AVERIA_DEVOLUCION)
+  invoiceRef   String?      // Ej: fact#555543
+  observations String?      // Col P: Observaciones limpias
+
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([zoneId, returnDate])
+  @@index([lotNumber])
+  @@index([productId])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  action     String   // Ej: CREATE_RETURN, UPDATE_CAUSE, UPDATE_PRICE, UPDATE_SALES
+  entityName String
+  entityId   String
+  oldValue   Json?
+  newValue   Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+}
