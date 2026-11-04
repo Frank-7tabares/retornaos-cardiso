@@ -15,15 +15,16 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Configuración de conexión MySQL compatible con Railway y entorno local
 function getDbConfig() {
-  const url =
+  const rawUrl =
     process.env.DATABASE_URL ||
     process.env.MYSQL_URL ||
     process.env.DATABASE_PUBLIC_URL ||
     process.env.MYSQL_PUBLIC_URL;
 
-  if (url) {
-    return url;
+  if (rawUrl && typeof rawUrl === 'string' && rawUrl.startsWith('mysql')) {
+    return rawUrl;
   }
+
   return {
     host: process.env.MYSQLHOST || process.env.DB_HOST || 'localhost',
     user: process.env.MYSQLUSER || process.env.DB_USER || 'root',
@@ -37,16 +38,18 @@ function getDbConfig() {
   };
 }
 
+const dbConfig = getDbConfig();
+console.log('🔍 Configuración de base de datos:', typeof dbConfig === 'string' ? 'URI Detectada' : dbConfig.host);
+
 let pool = null;
 try {
-  const cfg = getDbConfig();
-  pool = typeof cfg === 'string' ? mysql.createPool(cfg) : mysql.createPool(cfg);
-  console.log('✅ Pool de conexiones MySQL configurado correctamente');
+  pool = typeof dbConfig === 'string' ? mysql.createPool(dbConfig) : mysql.createPool(dbConfig);
+  console.log('✅ Pool de conexiones MySQL inicializado');
 } catch (e) {
   console.error('❌ Error configurando pool MySQL:', e.message);
 }
 
-// Inicialización automática y garantizada de tablas en MySQL
+// Inicialización automática de tablas en MySQL
 async function initDatabase() {
   if (!pool) {
     console.warn('⚠️ No hay pool de base de datos disponible.');
@@ -54,7 +57,7 @@ async function initDatabase() {
   }
   try {
     const conn = await pool.getConnection();
-    console.log('🚀 Verificando tablas en MySQL...');
+    console.log('🚀 Conectado con éxito a MySQL. Creando tablas si no existen...');
 
     // 1. Zonas y Rutas
     await conn.query(`
@@ -142,13 +145,38 @@ async function initDatabase() {
     console.log('✅ Las 4 tablas están verificadas y listas en MySQL.');
     conn.release();
   } catch (err) {
-    console.error('❌ Error inicializando tablas en MySQL:', err.message);
+    console.error('❌ Error en initDatabase():', err.message);
   }
 }
 
 // -------------------------------------------------------------
 // API Endpoints (/api/mysql/*)
 // -------------------------------------------------------------
+
+// Diagnóstico en vivo de conexión MySQL
+app.get('/api/mysql/debug', async (req, res) => {
+  const envVars = {
+    DATABASE_URL: process.env.DATABASE_URL ? 'DEFINIDA' : 'NO DEFINIDA',
+    MYSQL_URL: process.env.MYSQL_URL ? 'DEFINIDA' : 'NO DEFINIDA',
+    MYSQLHOST: process.env.MYSQLHOST || 'NO DEFINIDO',
+    MYSQLPORT: process.env.MYSQLPORT || 'NO DEFINIDO',
+    MYSQLUSER: process.env.MYSQLUSER || 'NO DEFINIDO',
+    MYSQLDATABASE: process.env.MYSQLDATABASE || 'NO DEFINIDO',
+  };
+
+  if (!pool) {
+    return res.status(500).json({ ok: false, error: 'Pool nulo', envVars });
+  }
+
+  try {
+    const conn = await pool.getConnection();
+    const [tables] = await conn.query('SHOW TABLES;');
+    conn.release();
+    res.json({ ok: true, status: 'CONECTADO_A_MYSQL', tables, envVars });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message, envVars });
+  }
+});
 
 // Health check para Railway
 app.get('/api/health', (req, res) => {
@@ -292,7 +320,7 @@ app.post('/api/mysql/returns', async (req, res) => {
 
     res.json({ ok: true, id: item.id });
   } catch (err) {
-    console.error('Error en POST /api/mysql/returns:', err.message);
+    console.error('❌ Error en POST /api/mysql/returns:', err.message);
     res.status(500).json({ ok: false, error: err.message });
   }
 });
