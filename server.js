@@ -15,14 +15,20 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Configuración de conexión MySQL compatible con Railway y entorno local
 function getDbConfig() {
-  if (process.env.DATABASE_URL || process.env.MYSQL_URL) {
-    return process.env.DATABASE_URL || process.env.MYSQL_URL;
+  const url =
+    process.env.DATABASE_URL ||
+    process.env.MYSQL_URL ||
+    process.env.DATABASE_PUBLIC_URL ||
+    process.env.MYSQL_PUBLIC_URL;
+
+  if (url) {
+    return url;
   }
   return {
     host: process.env.MYSQLHOST || process.env.DB_HOST || 'localhost',
     user: process.env.MYSQLUSER || process.env.DB_USER || 'root',
     password: process.env.MYSQLPASSWORD || process.env.DB_PASSWORD || '',
-    database: process.env.MYSQLDATABASE || process.env.DB_NAME || 'retorna_db',
+    database: process.env.MYSQLDATABASE || process.env.DB_NAME || 'railway',
     port: Number(process.env.MYSQLPORT || process.env.DB_PORT || 3306),
     waitForConnections: true,
     connectionLimit: 10,
@@ -35,45 +41,108 @@ let pool = null;
 try {
   const cfg = getDbConfig();
   pool = typeof cfg === 'string' ? mysql.createPool(cfg) : mysql.createPool(cfg);
-  console.log('✅ Pool de conexiones MySQL configurado');
+  console.log('✅ Pool de conexiones MySQL configurado correctamente');
 } catch (e) {
-  console.error('❌ Error configurando pool MySQL:', e);
+  console.error('❌ Error configurando pool MySQL:', e.message);
 }
 
-// Inicialización automática de tablas y datos semilla si no existen
+// Inicialización automática y garantizada de tablas en MySQL
 async function initDatabase() {
-  if (!pool) return;
+  if (!pool) {
+    console.warn('⚠️ No hay pool de base de datos disponible.');
+    return;
+  }
   try {
     const conn = await pool.getConnection();
-    console.log('🚀 Verificando base de datos MySQL...');
+    console.log('🚀 Verificando tablas en MySQL...');
 
-    const [tables] = await conn.query("SHOW TABLES LIKE 'devoluciones_detalle'");
-    if (Array.isArray(tables) && tables.length === 0) {
-      console.log('📦 Inicializando tablas y datos desde database_mysql_phpmyadmin.sql...');
-      const sqlScriptPath = path.join(__dirname, 'backend', 'database_mysql_phpmyadmin.sql');
-      if (fs.existsSync(sqlScriptPath)) {
-        const sqlContent = fs.readFileSync(sqlScriptPath, 'utf8');
-        const statements = sqlContent
-          .replace(/--.*$/gm, '')
-          .split(';')
-          .map((s) => s.trim())
-          .filter((s) => s.length > 0 && !s.toLowerCase().startsWith('set global'));
+    // 1. Zonas y Rutas
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS zonas_rutas (
+        id VARCHAR(50) NOT NULL PRIMARY KEY,
+        codigo VARCHAR(30) NOT NULL,
+        nombre_hoja_excel VARCHAR(120) NOT NULL,
+        nombre_consolidado VARCHAR(120) NOT NULL,
+        vendedor_titular VARCHAR(120) NOT NULL,
+        tipo_canal ENUM('RUTA_VENDEDOR', 'CLIENTE_ESPECIAL_Z14', 'PUNTO_DE_VENTA') NOT NULL DEFAULT 'RUTA_VENDEDOR',
+        ventas_mes_cop DECIMAL(15, 2) NOT NULL DEFAULT 0.00,
+        activa TINYINT(1) NOT NULL DEFAULT 1,
+        creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
 
-        for (const stmt of statements) {
-          try {
-            await conn.query(stmt);
-          } catch (e) {
-            // Ignorar avisos secundarios
-          }
-        }
-        console.log('✅ Tablas y registros iniciales creados exitosamente en MySQL');
-      }
-    } else {
-      console.log('✅ Base de datos lista con tabla devoluciones_detalle');
-    }
+    // 2. Usuarios
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS usuarios (
+        id VARCHAR(50) NOT NULL PRIMARY KEY,
+        nombre_completo VARCHAR(120) NOT NULL,
+        email VARCHAR(150) NOT NULL UNIQUE,
+        password_hash VARCHAR(255) NOT NULL,
+        rol ENUM('ADMIN', 'CALIDAD', 'RECEPCION', 'VENDEDOR', 'PDV') NOT NULL DEFAULT 'VENDEDOR',
+        etiqueta_rol VARCHAR(100) NOT NULL,
+        zona_asignada_id VARCHAR(50) DEFAULT NULL,
+        iniciales_avatar VARCHAR(5) NOT NULL DEFAULT 'US',
+        estado ENUM('ACTIVO', 'PENDIENTE_APROBACION') NOT NULL DEFAULT 'ACTIVO',
+        creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
+    // 3. Catálogo de Productos
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS catalogo_productos (
+        id VARCHAR(50) NOT NULL PRIMARY KEY,
+        sku VARCHAR(40) NOT NULL,
+        nombre VARCHAR(160) NOT NULL,
+        categoria VARCHAR(80) NOT NULL,
+        precio_2024_cop DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
+        precio_hasta_15_cop DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
+        activo TINYINT(1) NOT NULL DEFAULT 1,
+        creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
+    // 4. Devoluciones Detalle
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS devoluciones_detalle (
+        id VARCHAR(80) NOT NULL PRIMARY KEY,
+        fecha_recepcion DATE NOT NULL,
+        zona_id VARCHAR(50) NOT NULL,
+        zona_nombre VARCHAR(120) NOT NULL,
+        cliente_nombre VARCHAR(160) NOT NULL,
+        producto_id VARCHAR(50) NOT NULL,
+        producto_nombre VARCHAR(160) NOT NULL,
+        cantidad_a_recibir INT NOT NULL DEFAULT 1,
+        numero_lote VARCHAR(40) NOT NULL,
+        fecha_vencimiento DATE NOT NULL,
+        causa_a_cobrar INT NOT NULL DEFAULT 0,
+        causa_x_fecha INT NOT NULL DEFAULT 0,
+        causa_vacio INT NOT NULL DEFAULT 0,
+        causa_prox_vencer INT NOT NULL DEFAULT 0,
+        causa_vencido INT NOT NULL DEFAULT 0,
+        causa_abomba INT NOT NULL DEFAULT 0,
+        causa_lechozo INT NOT NULL DEFAULT 0,
+        costo_unitario_cop DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
+        valor_comercial_cop DECIMAL(14, 2) NOT NULL DEFAULT 0.00,
+        valor_calidad_cop DECIMAL(14, 2) NOT NULL DEFAULT 0.00,
+        valor_total_cop DECIMAL(14, 2) NOT NULL DEFAULT 0.00,
+        tipo_movimiento VARCHAR(40) NOT NULL DEFAULT 'AVERIA_DEVOLUCION',
+        estado_cuadre VARCHAR(40) NOT NULL DEFAULT 'CUADRADO',
+        referencia_factura VARCHAR(60) DEFAULT NULL,
+        observaciones TEXT DEFAULT NULL,
+        foto_evidencia_url LONGTEXT DEFAULT NULL,
+        diagnostico_tecnico TEXT DEFAULT NULL,
+        temperatura_recepcion_c DECIMAL(4, 1) DEFAULT 4.0,
+        revisado_ingenieria TINYINT(1) NOT NULL DEFAULT 0,
+        nota_ingeniera_produccion TEXT DEFAULT NULL,
+        creado_por VARCHAR(120) NOT NULL,
+        creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
+    console.log('✅ Las 4 tablas están verificadas y listas en MySQL.');
     conn.release();
   } catch (err) {
-    console.warn('⚠️ Advertencia en verificación inicial de MySQL:', err.message);
+    console.error('❌ Error inicializando tablas en MySQL:', err.message);
   }
 }
 
@@ -83,7 +152,12 @@ async function initDatabase() {
 
 // Health check para Railway
 app.get('/api/health', (req, res) => {
-  res.json({ ok: true, status: 'online', timestamp: new Date().toISOString() });
+  res.json({
+    ok: true,
+    status: 'online',
+    hasPool: Boolean(pool),
+    timestamp: new Date().toISOString(),
+  });
 });
 
 // 1. GET /api/mysql/state -> Listar devoluciones
@@ -218,6 +292,7 @@ app.post('/api/mysql/returns', async (req, res) => {
 
     res.json({ ok: true, id: item.id });
   } catch (err) {
+    console.error('Error en POST /api/mysql/returns:', err.message);
     res.status(500).json({ ok: false, error: err.message });
   }
 });
