@@ -579,7 +579,9 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-lg sm:text-2xl font-bold tracking-tight text-neutral-900 dark:text-white">
-              Planilla de Devoluciones, Lotes y Fotos
+              {currentUser.role === 'VENDEDOR' || currentUser.role === 'PDV'
+                ? `Mis Devoluciones — ${activeZone?.consolidatedName || currentUser.name}`
+                : `Devoluciones por Vendedor — ${activeZone?.consolidatedName || 'Todas las Zonas'}`}
             </h1>
             {activeZone && !searchAllZonesForLot && (
               <Badge variant="indigo">{activeZone.code}</Badge>
@@ -591,7 +593,15 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
             )}
           </div>
           <p className="mt-0.5 text-xs sm:text-sm text-neutral-600 dark:text-slate-300">
-            Todo lo que registres aquí se guarda directo en <strong>MySQL (retorna_db)</strong> y aparece en <strong>Ingenieras de Producción</strong>.
+            {currentUser.role === 'VENDEDOR' || currentUser.role === 'PDV' ? (
+              <>
+                Aquí puedes consultar todas las devoluciones de tu zona sincronizadas desde el archivo oficial de <strong>Despachos / HGI</strong>.
+              </>
+            ) : (
+              <>
+                Consulta de devoluciones sincronizadas desde el Excel diario en <strong>MySQL (retorna_db)</strong> por cada zona y vendedor.
+              </>
+            )}
           </p>
         </div>
 
@@ -611,17 +621,20 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
           </select>
 
           <div className="flex flex-wrap gap-2">
-            {/* Upload / Sync Daily Excel (.xlsx) CTA */}
-            {onOpenExcelModal && (
-              <button
-                type="button"
-                onClick={onOpenExcelModal}
-                className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-indigo-400/50 bg-indigo-600/90 hover:bg-indigo-500 px-3.5 py-2.5 text-xs font-bold text-white shadow-lg shadow-indigo-600/25 transition-all duration-200"
-              >
-                <FileSpreadsheet className="h-4 w-4 shrink-0" />
-                <span className="truncate">Subir / Actualizar Excel (.xlsx)</span>
-              </button>
-            )}
+            {/* Upload / Sync Daily Excel (.xlsx) CTA: Solo Admin, Recepción o Calidad */}
+            {onOpenExcelModal &&
+              (currentUser.role === 'ADMIN' ||
+                currentUser.role === 'RECEPCION' ||
+                currentUser.role === 'CALIDAD') && (
+                <button
+                  type="button"
+                  onClick={onOpenExcelModal}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-indigo-400/50 bg-indigo-600/90 hover:bg-indigo-500 px-3.5 py-2.5 text-xs font-bold text-white shadow-lg shadow-indigo-600/25 transition-all duration-200"
+                >
+                  <FileSpreadsheet className="h-4 w-4 shrink-0" />
+                  <span className="truncate">Subir / Actualizar Excel (.xlsx)</span>
+                </button>
+              )}
 
             {/* Toggle Hidden Columns Q..W */}
             <button
@@ -631,8 +644,8 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
                 setShowHiddenMoneyCols(next);
                 toast.info(
                   next
-                    ? 'Columnas ocultas Q–W reveladas ($ COP)'
-                    : 'Vista compacta en Unidades (Cols G–M)'
+                    ? 'Valores en pesos ($ COP) visibles por causa'
+                    : 'Vista compacta en Unidades'
                 );
               }}
               className={`inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2.5 text-xs font-medium backdrop-blur-xl transition-all duration-200 ${
@@ -647,21 +660,81 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
                 <Eye className="h-3.5 w-3.5 shrink-0" />
               )}
               <span className="truncate">
-                {showHiddenMoneyCols ? 'Ocultar $ (Q–W)' : 'Cols Ocultas ($)'}
+                {showHiddenMoneyCols ? 'Ocultar Valores ($)' : 'Ver Valores ($)'}
               </span>
-            </button>
-
-            {/* New Return Item CTA */}
-            <button
-              type="button"
-              onClick={() => setIsModalOpen(true)}
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 px-3.5 py-2.5 text-xs font-semibold text-white shadow-lg shadow-emerald-600/25 transition-all duration-200"
-            >
-              <Camera className="h-4 w-4 shrink-0" />
-              <span className="truncate">+ Registrar Individual</span>
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Resumen Ejecutivo de Mis Devoluciones (4 Tarjetas Rápidas para el Vendedor) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <BentoCard className="p-3.5 sm:p-4">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400">
+            Total Mis Devoluciones
+          </span>
+          <div className="mt-1 flex items-baseline gap-2">
+            <span className="font-mono text-xl sm:text-2xl font-extrabold text-neutral-900 dark:text-white">
+              {formatCOP(tableTotals.totalCOP)}
+            </span>
+          </div>
+          <p className="mt-1 text-[11px] text-indigo-400 font-medium">
+            {formatNumber(tableTotals.qtyToReceive)} unds en {zoneRows.length} registros
+          </p>
+        </BentoCard>
+
+        <BentoCard className="p-3.5 sm:p-4">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-rose-400">
+            A Cobrar (Factura / Cruce)
+          </span>
+          <div className="mt-1 flex items-baseline gap-2">
+            <span className="font-mono text-xl sm:text-2xl font-extrabold text-rose-400">
+              {formatCOP(tableTotals.causesCOP.aCobrar)}
+            </span>
+          </div>
+          <p className="mt-1 text-[11px] text-neutral-500 dark:text-slate-300">
+            {formatNumber(tableTotals.causes.aCobrar)} unidades a cobrar
+          </p>
+        </BentoCard>
+
+        <BentoCard className="p-3.5 sm:p-4">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-amber-400">
+            Próx. a Vencer / Vencido
+          </span>
+          <div className="mt-1 flex items-baseline gap-2">
+            <span className="font-mono text-xl sm:text-2xl font-extrabold text-amber-400">
+              {formatCOP(
+                tableTotals.causesCOP.proxVencer + tableTotals.causesCOP.vencido
+              )}
+            </span>
+          </div>
+          <p className="mt-1 text-[11px] text-neutral-500 dark:text-slate-300">
+            {formatNumber(
+              tableTotals.causes.proxVencer + tableTotals.causes.vencido
+            )}{' '}
+            unds rotación comercial
+          </p>
+        </BentoCard>
+
+        <BentoCard className="p-3.5 sm:p-4">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-sky-400">
+            Calidad Planta (Vacío / Lechoso)
+          </span>
+          <div className="mt-1 flex items-baseline gap-2">
+            <span className="font-mono text-xl sm:text-2xl font-extrabold text-sky-400">
+              {formatCOP(tableTotals.qualCOP)}
+            </span>
+          </div>
+          <p className="mt-1 text-[11px] text-neutral-500 dark:text-slate-300">
+            {formatNumber(
+              tableTotals.causes.vacio +
+                tableTotals.causes.lechozo +
+                tableTotals.causes.xFecha +
+                tableTotals.causes.abomba
+            )}{' '}
+            unds calidad planta
+          </p>
+        </BentoCard>
       </div>
 
       {/* Interactive Lot & Cause Explorer Bar (Mobile Responsive) */}
@@ -681,29 +754,31 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
                 )}
               </div>
               <p className="text-[11px] text-neutral-500 dark:text-slate-300">
-                Rastrea cualquier lote y revisa su evidencia fotográfica.
+                Filtra tus devoluciones por número de lote o por motivo de devolución.
               </p>
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 lg:flex flex-wrap items-center gap-2">
-            {/* Toggle Global Lot Search across all 23 zones */}
-            <button
-              type="button"
-              onClick={() => setSearchAllZonesForLot((prev) => !prev)}
-              className={`inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-medium transition-all ${
-                searchAllZonesForLot
-                  ? 'border-emerald-400/50 bg-emerald-500/20 text-emerald-700 dark:text-emerald-200'
-                  : 'border-neutral-300 dark:border-white/15 bg-white/70 dark:bg-slate-950/60 text-neutral-700 dark:text-slate-300'
-              }`}
-            >
-              <Globe className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">
-                {searchAllZonesForLot
-                  ? 'Global: Todas las Zonas'
-                  : 'Buscar en Todas las Zonas'}
-              </span>
-            </button>
+            {/* Toggle Global Lot Search across all zones (Solo Admin, Calidad, Recepción) */}
+            {currentUser.role !== 'VENDEDOR' && currentUser.role !== 'PDV' && (
+              <button
+                type="button"
+                onClick={() => setSearchAllZonesForLot((prev) => !prev)}
+                className={`inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-medium transition-all ${
+                  searchAllZonesForLot
+                    ? 'border-emerald-400/50 bg-emerald-500/20 text-emerald-700 dark:text-emerald-200'
+                    : 'border-neutral-300 dark:border-white/15 bg-white/70 dark:bg-slate-950/60 text-neutral-700 dark:text-slate-300'
+                }`}
+              >
+                <Globe className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">
+                  {searchAllZonesForLot
+                    ? 'Global: Todas las Zonas'
+                    : 'Buscar en Todas las Zonas'}
+                </span>
+              </button>
+            )}
 
             {/* Dropdown Filter by Cause */}
             <select
@@ -920,32 +995,14 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
                 return (
                   <div
                     key={row.id}
-                    className={`p-3.5 space-y-3 ${
+                    className={`p-3.5 space-y-2.5 ${
                       row.reconciliationStatus === 'REVISAR'
                         ? 'bg-amber-500/[0.08]'
                         : ''
                     }`}
                   >
-                    {/* Top row: Photo + Product + Lot + Total $ */}
-                    <div className="flex items-start gap-3">
-                      <button
-                        type="button"
-                        onClick={() => openInspectModal(row)}
-                        className="relative h-16 w-20 shrink-0 overflow-hidden rounded-xl border border-white/20 bg-slate-900 shadow-sm"
-                      >
-                        <img
-                          src={
-                            row.evidencePhotoUrl ||
-                            SAMPLE_EVIDENCE_PHOTOS[0].url
-                          }
-                          alt={row.productName}
-                          className="h-full w-full object-cover"
-                        />
-                        <div className="absolute bottom-1 right-1 rounded bg-black/75 px-1 py-0.5 font-mono text-[9px] text-emerald-300">
-                          {row.storageTempC ?? 4.0}°C
-                        </div>
-                      </button>
-
+                    {/* Top row: Date + Product + Lot */}
+                    <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-2">
                           <span className="font-mono text-[11px] font-semibold text-indigo-400">
@@ -977,7 +1034,7 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
                     <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-neutral-200/70 dark:border-white/10 bg-neutral-100/60 dark:bg-slate-950/60 px-3 py-2 text-xs">
                       <div className="flex flex-wrap items-center gap-1.5">
                         <span className="font-mono font-bold text-neutral-900 dark:text-white">
-                          Recibir: {row.qtyToReceive}u
+                          Cant: {row.qtyToReceive}u
                         </span>
                         <span>·</span>
                         {CAUSE_METADATA.map((c) => {
@@ -998,9 +1055,9 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
                       </div>
                     </div>
 
-                    {/* Diagnosis & Status */}
+                    {/* Observations & Status */}
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex flex-wrap items-center gap-1.5">
                         {row.reconciliationStatus === 'CUADRADO' ? (
                           <Badge variant="success" dot>
                             CUADRADO
@@ -1015,44 +1072,47 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
                             {primaryMeta.fullLabel}
                           </span>
                         )}
-                      </div>
-
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => openInspectModal(row)}
-                          className="inline-flex items-center gap-1 rounded-xl bg-indigo-600/90 hover:bg-indigo-500 px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm"
-                        >
-                          <Camera className="h-3 w-3" />
-                          Ver Ficha y Foto
-                        </button>
-
-                        {row.reconciliationStatus === 'REVISAR' && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              onAutoFixRow(row.id);
-                              toast.success('Registro cuadrado automáticamente');
-                            }}
-                            className="rounded-xl bg-amber-500/20 p-1.5 text-amber-300"
-                            title="Cuadrar fila"
-                          >
-                            <Wrench className="h-4 w-4" />
-                          </button>
+                        {row.observations && (
+                          <span className="text-[11px] text-amber-300/90 font-medium">
+                            · {row.observations}
+                          </span>
                         )}
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            onDeleteRow(row.id);
-                            toast.info('Registro eliminado de MySQL retorna_db');
-                          }}
-                          className="rounded-xl bg-rose-500/15 p-1.5 text-rose-400"
-                          title="Eliminar"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
                       </div>
+
+                      {currentUser.role !== 'VENDEDOR' &&
+                        currentUser.role !== 'PDV' && (
+                          <div className="flex items-center gap-1.5">
+                            {row.reconciliationStatus === 'REVISAR' && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  onAutoFixRow(row.id);
+                                  toast.success(
+                                    'Registro cuadrado automáticamente'
+                                  );
+                                }}
+                                className="rounded-xl bg-amber-500/20 p-1.5 text-amber-300"
+                                title="Cuadrar fila"
+                              >
+                                <Wrench className="h-4 w-4" />
+                              </button>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onDeleteRow(row.id);
+                                toast.info(
+                                  'Registro eliminado de MySQL retorna_db'
+                                );
+                              }}
+                              className="rounded-xl bg-rose-500/15 p-1.5 text-rose-400"
+                              title="Eliminar"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        )}
                     </div>
                   </div>
                 );
@@ -1080,11 +1140,10 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b border-neutral-200 dark:border-white/10 bg-neutral-50/80 dark:bg-slate-950/60 text-[10px] font-semibold uppercase tracking-wider text-neutral-600 dark:text-slate-300">
-                    <th className="py-3 pl-4 pr-2">Evidencia Foto</th>
-                    <th className="px-2 py-3">Fecha / Ruta</th>
+                    <th className="py-3 pl-4 pr-2">Fecha / Ruta</th>
                     <th className="px-2 py-3">Cliente / Sede (B)</th>
                     <th className="px-2 py-3">Producto (C)</th>
-                    <th className="px-2 py-3 text-center">Recibir (D)</th>
+                    <th className="px-2 py-3 text-center">Cant. (D)</th>
                     <th className="px-2 py-3 text-center">Lote (E) / Venc (F)</th>
                     {CAUSE_METADATA.map((c) => (
                       <th
@@ -1104,8 +1163,7 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
                       </th>
                     ))}
                     <th className="px-2 py-3 text-right">Total $ (Q–W)</th>
-                    <th className="px-2 py-3">Diagnóstico de Causa & Cuadre</th>
-                    <th className="py-3 pl-2 pr-4 text-right">Acción</th>
+                    <th className="py-3 pl-2 pr-4">Observaciones / Factura (Col P)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-200/60 dark:divide-white/[0.08] text-xs">
@@ -1123,55 +1181,14 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
                             : 'hover:bg-indigo-500/[0.06] dark:hover:bg-white/[0.05]'
                         }`}
                       >
-                        {/* Photo Evidence Thumbnail */}
-                        <td className="py-2.5 pl-4 pr-2 whitespace-nowrap">
-                          <button
-                            type="button"
-                            onClick={() => openInspectModal(row)}
-                            className="group relative flex items-center gap-2 rounded-xl border border-white/20 bg-slate-900/80 p-1 pr-2.5 text-left hover:border-indigo-400 transition-all shadow-sm"
-                            title="Haz clic para ampliar foto de evidencia y diagnóstico técnico"
-                          >
-                            <div className="relative h-10 w-12 overflow-hidden rounded-lg bg-slate-800 shrink-0">
-                              <img
-                                src={
-                                  row.evidencePhotoUrl ||
-                                  SAMPLE_EVIDENCE_PHOTOS[0].url
-                                }
-                                alt={row.productName}
-                                className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-300"
-                              />
-                              <div className="absolute inset-0 bg-black/25 group-hover:bg-black/0 transition-colors flex items-center justify-center">
-                                <Camera className="h-3.5 w-3.5 text-white drop-shadow" />
-                              </div>
-                            </div>
-                            <div className="hidden sm:block">
-                              <div className="text-[10px] font-semibold text-indigo-300 group-hover:text-indigo-200">
-                                Ver Foto
-                              </div>
-                              {row.storageTempC !== undefined && (
-                                <div
-                                  className={`text-[10px] font-mono flex items-center gap-0.5 ${
-                                    row.storageTempC > 5
-                                      ? 'text-rose-400'
-                                      : 'text-emerald-400'
-                                  }`}
-                                >
-                                  <Thermometer className="h-2.5 w-2.5" />
-                                  {row.storageTempC}°C
-                                </div>
-                              )}
-                            </div>
-                          </button>
-                        </td>
-
-                        <td className="px-2 py-3 font-mono text-[11px] text-neutral-600 dark:text-slate-300 whitespace-nowrap">
+                        <td className="py-3 pl-4 pr-2 font-mono text-[11px] text-neutral-600 dark:text-slate-300 whitespace-nowrap">
                           <div>{row.date}</div>
                           <span className="text-[10px] font-semibold text-indigo-500 dark:text-indigo-300">
                             {row.zoneId}
                           </span>
                         </td>
 
-                        <td className="px-2 py-3 font-medium text-neutral-900 dark:text-slate-100 max-w-[160px] truncate">
+                        <td className="px-2 py-3 font-medium text-neutral-900 dark:text-slate-100 max-w-[180px] truncate">
                           {row.clientName}
                         </td>
 
@@ -1181,7 +1198,7 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
                           </div>
                           <div className="flex items-center gap-2 mt-0.5">
                             <span className="font-mono text-[10px] text-neutral-500 dark:text-slate-400">
-                              Costo: {formatCOP(row.unitCost)}
+                              Unit: {formatCOP(row.unitCost)}
                             </span>
                             {row.invoiceRef && (
                               <span className="inline-flex items-center gap-1 text-[10px] font-mono text-rose-400">
@@ -1253,7 +1270,7 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
                           {formatCOP(row.totalValueCOP)}
                         </td>
 
-                        <td className="px-2 py-3 max-w-[260px]">
+                        <td className="py-3 pl-2 pr-4 max-w-[260px]">
                           <div className="flex flex-col gap-1">
                             <div className="flex flex-wrap items-center gap-1.5">
                               {row.reconciliationStatus === 'CUADRADO' && (
@@ -1283,54 +1300,15 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
                               )}
                             </div>
 
-                            <p className="text-[11px] text-neutral-600 dark:text-slate-300 line-clamp-2 leading-snug">
-                              {row.technicalDiagnosis || row.observations}
-                            </p>
-
-                            <button
-                              type="button"
-                              onClick={() => openInspectModal(row)}
-                              className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-500 dark:text-indigo-300 hover:underline w-fit"
-                            >
-                              <Stethoscope className="h-3 w-3" />
-                              Ver causa técnica y cambiar foto
-                            </button>
-                          </div>
-                        </td>
-
-                        <td className="py-3 pl-2 pr-4 text-right whitespace-nowrap">
-                          <div className="inline-flex items-center gap-1">
-                            {row.reconciliationStatus === 'REVISAR' && (
-                              <TooltipHint label="Cuadrar automáticamente asignando la diferencia a Próx. Vencer">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    onAutoFixRow(row.id);
-                                    toast.success(
-                                      'Registro cuadrado automáticamente en MySQL',
-                                      {
-                                        description: `Se conciliaron las ${row.qtyToReceive} unidades de ${row.productName}.`,
-                                      }
-                                    );
-                                  }}
-                                  className="rounded-lg bg-amber-500/15 hover:bg-amber-500/25 p-1.5 text-amber-400 transition-colors"
-                                >
-                                  <Wrench className="h-3.5 w-3.5" />
-                                </button>
-                              </TooltipHint>
+                            {row.observations ? (
+                              <p className="text-[11px] font-medium text-amber-300/95 leading-snug">
+                                {row.observations}
+                              </p>
+                            ) : (
+                              <p className="text-[11px] text-neutral-500 dark:text-slate-400 leading-snug">
+                                {primaryMeta?.fullLabel || 'Devolución registrada'}
+                              </p>
                             )}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                onDeleteRow(row.id);
-                                toast.info(
-                                  'Línea eliminada de MySQL retorna_db'
-                                );
-                              }}
-                              className="rounded-lg p-1.5 text-neutral-400 hover:bg-rose-500/10 hover:text-rose-400 transition-colors"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
                           </div>
                         </td>
                       </tr>
@@ -1339,7 +1317,7 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
                 </tbody>
                 <tfoot>
                   <tr className="border-t-2 border-neutral-300 dark:border-white/20 bg-neutral-100/90 dark:bg-slate-950/90 font-mono text-xs font-bold text-neutral-900 dark:text-white">
-                    <td colSpan={4} className="py-3 pl-4 pr-2 font-sans">
+                    <td colSpan={3} className="py-3 pl-4 pr-2 font-sans">
                       TOTAL FILTRADO ({zoneRows.length} registros)
                     </td>
                     <td className="px-2 py-3 text-center">
@@ -1361,7 +1339,7 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
                     <td className="px-2 py-3 text-right text-indigo-400">
                       {formatCOP(tableTotals.totalCOP)}
                     </td>
-                    <td colSpan={2} className="py-3 pl-2 pr-4" />
+                    <td className="py-3 pl-2 pr-4" />
                   </tr>
                 </tfoot>
               </table>

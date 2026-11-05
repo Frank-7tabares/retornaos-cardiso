@@ -614,7 +614,7 @@ export function App() {
                 </button>
               )}
 
-              {/* 2. Planilla: Todos (Vendedores en su zona, PDV en su sede, Admin/Calidad) */}
+              {/* 2. Mis Devoluciones: Todos (Vendedores en su zona, PDV en su sede, Admin/Calidad) */}
               <button
                 type="button"
                 onClick={() => setActiveTab('WORKBENCH')}
@@ -626,8 +626,8 @@ export function App() {
               >
                 <ClipboardCheck className="h-3.5 w-3.5" />
                 {currentUser.role === 'VENDEDOR' || currentUser.role === 'PDV'
-                  ? 'Planilla de Devolución & Fotos'
-                  : '2. Planilla, Lotes y Fotos'}
+                  ? 'Mis Devoluciones'
+                  : '2. Mis Devoluciones (Vendedores)'}
               </button>
 
               {/* 3. Ingenieras de Producción: EXCLUSIVO para Calidad y Admin */}
@@ -734,15 +734,19 @@ export function App() {
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setIsExcelModalOpen(true)}
-              title="Subir o actualizar el archivo Excel acumulado del día (.xlsx)"
-              className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-400/50 bg-emerald-600/90 hover:bg-emerald-500 px-3 py-1.5 text-xs font-bold text-white shadow-sm shadow-emerald-600/20 transition-all"
-            >
-              <FileSpreadsheet className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Subir Excel (.xlsx)</span>
-            </button>
+            {(currentUser.role === 'ADMIN' ||
+              currentUser.role === 'RECEPCION' ||
+              currentUser.role === 'CALIDAD') && (
+              <button
+                type="button"
+                onClick={() => setIsExcelModalOpen(true)}
+                title="Subir o actualizar el archivo Excel acumulado del día (.xlsx)"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-400/50 bg-emerald-600/90 hover:bg-emerald-500 px-3 py-1.5 text-xs font-bold text-white shadow-sm shadow-emerald-600/20 transition-all"
+              >
+                <FileSpreadsheet className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Subir Excel (.xlsx)</span>
+              </button>
+            )}
 
             <button
               type="button"
@@ -820,7 +824,7 @@ export function App() {
               </button>
             )}
 
-            {/* Planilla de Devoluciones */}
+            {/* Mis Devoluciones */}
             <button
               type="button"
               onClick={() => setActiveTab('WORKBENCH')}
@@ -831,7 +835,7 @@ export function App() {
               }`}
             >
               <ClipboardCheck className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">Planilla Devoluciones</span>
+              <span className="truncate">Mis Devoluciones</span>
             </button>
 
             {/* Ingenieras de Producción: Solo Calidad y Admin */}
