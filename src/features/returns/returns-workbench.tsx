@@ -195,12 +195,20 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
     }
   }, [externalLotFilter]);
 
-  // RBAC: Si el usuario es VENDEDOR o PDV, solo ve su zona asignada
+  // RBAC: Si el usuario es VENDEDOR o PDV, solo ve su zona asignada (Arturo Montilla tiene Z02 y Z15 en el Excel)
   const accessibleZones = useMemo(() => {
     if (
       (currentUser.role === 'VENDEDOR' || currentUser.role === 'PDV') &&
       currentUser.assignedZoneId
     ) {
+      if (
+        currentUser.id === 'usr-z15' ||
+        currentUser.id === 'usr-z02' ||
+        currentUser.assignedZoneId === 'Z02' ||
+        currentUser.assignedZoneId === 'Z15'
+      ) {
+        return zones.filter((z) => z.id === 'Z02' || z.id === 'Z15');
+      }
       return zones.filter((z) => z.id === currentUser.assignedZoneId);
     }
     return zones;
@@ -250,8 +258,26 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
       accessibleZones.length > 0
     ) {
       onChangeZoneId(activeZone.id);
+      return;
     }
-  }, [activeZone, selectedZoneId, accessibleZones, onChangeZoneId]);
+    if (
+      (currentUser.id === 'usr-z15' || currentUser.id === 'usr-z02') &&
+      selectedZoneId === 'Z15'
+    ) {
+      const z15HasRows = returnRows.some((r) => r.zoneId === 'Z15');
+      const z02HasRows = returnRows.some((r) => r.zoneId === 'Z02');
+      if (!z15HasRows && z02HasRows) {
+        onChangeZoneId('Z02');
+      }
+    }
+  }, [
+    activeZone,
+    selectedZoneId,
+    accessibleZones,
+    onChangeZoneId,
+    currentUser.id,
+    returnRows,
+  ]);
 
   const zoneRows = useMemo(() => {
     if (!activeZone) return [];

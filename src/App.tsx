@@ -44,7 +44,10 @@ import { BentoGridSkeleton } from './components/ui/skeleton';
 import { Badge } from './components/ui/badge';
 import { Modal } from './components/ui/modal';
 import { ExcelSyncModal } from './components/excel-sync-modal';
-import { recalculateZonesFromRows } from './lib/excel-parser';
+import {
+  parseReturnsExcelWorkbook,
+  recalculateZonesFromRows,
+} from './lib/excel-parser';
 
 type ActiveTab = 'DASHBOARD' | 'WORKBENCH' | 'ENGINEERING' | 'CATALOG';
 
@@ -130,27 +133,69 @@ export function App() {
   );
   const [returnItems, setReturnItems] =
     useState<ReturnLineItem[]>(INITIAL_RETURN_ITEMS);
-  const [selectedZoneId, setSelectedZoneId] = useState<string>('Z01');
+  const [selectedZoneId, setSelectedZoneId] = useState<string>(() => {
+    if (currentUser?.id === 'usr-z15' || currentUser?.id === 'usr-z02') {
+      return 'Z02';
+    }
+    return currentUser?.assignedZoneId || 'Z01';
+  });
   const [externalLotFilter, setExternalLotFilter] = useState<string>('ALL');
   const [mysqlConnected, setMysqlConnected] = useState<boolean>(false);
 
   // Sync initial return items from MySQL database (retorna_db in phpMyAdmin / HeidiSQL / Railway)
+  // If MySQL only has the old demo rows, automatically load DEV_FACT_03_NOVIEMBRE.xlsx (633 rows) and sync to MySQL
   useEffect(() => {
+    const autoLoadDefaultExcel = async () => {
+      try {
+        const res = await fetch('/DEV_FACT_03_NOVIEMBRE.xlsx');
+        if (!res.ok) return;
+        const buffer = await res.arrayBuffer();
+        const parsed = parseReturnsExcelWorkbook(
+          buffer,
+          'DEV FACT 03 DE NOVIEMBRE VENDEDORES.xlsx'
+        );
+        if (parsed.items.length > 0) {
+          setReturnItems(parsed.items);
+          setZones((prev) => recalculateZonesFromRows(prev, parsed.items));
+          fetch('/api/mysql/returns/bulk', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              items: parsed.items,
+              clearDemo: true,
+              replaceAll: false,
+            }),
+          })
+            .then((r) => r.json())
+            .then((d) => {
+              if (d?.ok) setMysqlConnected(true);
+            })
+            .catch(() => {});
+        }
+      } catch {}
+    };
+
     fetch('/api/mysql/state')
       .then((r) => r.json())
       .then((data) => {
         if (data?.ok && Array.isArray(data.returnItems)) {
           setMysqlConnected(true);
-          if (data.returnItems.length > 0) {
+          const hasExcelRows = data.returnItems.some((item: ReturnLineItem) =>
+            String(item.id).startsWith('xl-')
+          );
+          if (hasExcelRows) {
             setReturnItems(data.returnItems);
-            if (data.returnItems.some((item: ReturnLineItem) => String(item.id).startsWith('xl-'))) {
-              setZones((prev) => recalculateZonesFromRows(prev, data.returnItems));
-            }
+            setZones((prev) => recalculateZonesFromRows(prev, data.returnItems));
+          } else {
+            autoLoadDefaultExcel();
           }
+        } else {
+          autoLoadDefaultExcel();
         }
       })
       .catch(() => {
         setMysqlConnected(false);
+        autoLoadDefaultExcel();
       });
   }, []);
 
@@ -499,6 +544,9 @@ export function App() {
       setActiveTab('ENGINEERING');
     } else if (user.role === 'ADMIN') {
       setActiveTab('DASHBOARD');
+    } else if (user.id === 'usr-z15' || user.id === 'usr-z02') {
+      setSelectedZoneId('Z02');
+      setActiveTab('WORKBENCH');
     } else if (user.assignedZoneId) {
       setSelectedZoneId(user.assignedZoneId);
       setActiveTab('WORKBENCH');
