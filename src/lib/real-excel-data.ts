@@ -166,7 +166,7 @@ export const DEMO_USERS: UserProfile[] = [
   },
   {
     id: 'usr-z02',
-    name: 'Oscar Villadiego (Luisa Restrepo)',
+    name: 'Oscar Villadiego / Arturo Montilla',
     email: 'z02.villadiego@alimentoscarla.co',
     role: 'VENDEDOR',
     roleLabel: 'Vendedor Zona Z02',
@@ -306,6 +306,17 @@ export const DEMO_USERS: UserProfile[] = [
     avatarInitials: 'AM',
     status: 'ACTIVO',
     passwordHash: 'z15*carla',
+  },
+  {
+    id: 'usr-z16',
+    name: 'Huber Alfonso Pino',
+    email: 'z16.pino@alimentoscarla.co',
+    role: 'VENDEDOR',
+    roleLabel: 'Vendedor Zona Z16',
+    assignedZoneId: 'Z16',
+    avatarInitials: 'HP',
+    status: 'ACTIVO',
+    passwordHash: 'z16*carla',
   },
 
   // 3. Clientes Especiales Mayoristas (Z14)
@@ -632,6 +643,18 @@ export const REAL_ZONES_SUMMARY: ZoneSummary[] = [
     lineItemsCount: 0,
     unitsByCause: { aCobrar: 0, xFecha: 0, vacio: 0, proxVencer: 0, vencido: 0, abomba: 0, lechozo: 0 },
     copByCause: { aCobrar: 0, xFecha: 0, vacio: 0, proxVencer: 0, vencido: 0, abomba: 0, lechozo: 0 },
+  },
+  {
+    id: 'Z16',
+    code: 'Z16',
+    sheetName: 'Z16 HUBER ALFONSO PINO',
+    consolidatedName: 'Z16 HUBER ALFONSO PINO',
+    currentSeller: 'Huber Alfonso Pino',
+    type: 'RUTA_VENDEDOR',
+    monthlySalesCOP: 24500000,
+    lineItemsCount: 4,
+    unitsByCause: { aCobrar: 0, xFecha: 0, vacio: 0, proxVencer: 3, vencido: 0, abomba: 0, lechozo: 1 },
+    copByCause: { aCobrar: 0, xFecha: 0, vacio: 0, proxVencer: 28150, vencido: 0, abomba: 0, lechozo: 10650 },
   },
   {
     id: 'Z14-FRONTINO',

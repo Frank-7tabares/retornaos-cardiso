@@ -4,56 +4,71 @@ import {
   Search,
   Calendar,
   Tag,
-  Camera,
-  Thermometer,
   CheckCircle2,
   AlertTriangle,
-  Sparkles,
   Package,
-  MapPin,
-  User,
-  Maximize2,
-  ClipboardCheck,
-  Filter,
+  Download,
   X,
+  FileSpreadsheet,
+  BarChart3,
+  Layers,
+  ShieldAlert,
+  ArrowUpRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '../../components/ui/badge';
-import { Modal } from '../../components/ui/modal';
 import { EmptyState } from '../../components/ui/empty-state';
-import {
-  CAUSE_METADATA,
-  REAL_PRODUCTS_CATALOG,
-} from '../../lib/real-excel-data';
-import { formatCOP, formatNumber } from '../../lib/utils';
+import { CAUSE_METADATA } from '../../lib/real-excel-data';
+import { formatCOP, formatNumber, formatPercent } from '../../lib/utils';
 import { ComputedReturnRow, ReturnCauseKey } from '../../types/returns';
 
 interface ProductionEngineeringViewProps {
   returnRows: ComputedReturnRow[];
-  onUpdateRowEvidence: (
+  onUpdateRowEvidence?: (
     rowId: string,
     photoUrl: string,
     technicalDiagnosis: string,
     storageTempC: number
   ) => void;
+  onOpenExcelModal?: () => void;
+}
+
+interface ProductQualitySummary {
+  productId: string;
+  productName: string;
+  totalUnits: number;
+  qualityUnits: number;
+  commercialUnits: number;
+  totalCOP: number;
+  qualityCOP: number;
+  commercialCOP: number;
+  causes: Record<ReturnCauseKey, number>;
+  dominantCauseKey: ReturnCauseKey;
+  dominantCauseUnits: number;
+  lotsMap: Map<
+    string,
+    {
+      lot: string;
+      totalUnits: number;
+      lechozo: number;
+      vacio: number;
+      xFecha: number;
+      abomba: number;
+      proxVencer: number;
+    }
+  >;
 }
 
 export const ProductionEngineeringView: React.FC<
   ProductionEngineeringViewProps
-> = ({ returnRows, onUpdateRowEvidence }) => {
+> = ({ returnRows, onOpenExcelModal }) => {
   const [selectedProductFilter, setSelectedProductFilter] =
     useState<string>('ALL');
   const [selectedDateFilter, setSelectedDateFilter] = useState<string>('ALL');
   const [selectedLotFilter, setSelectedLotFilter] = useState<string>('ALL');
-  const [responsibilityFilter, setResponsibilityFilter] = useState<
-    'ALL' | 'CALIDAD' | 'COMERCIAL'
-  >('ALL');
+  const [causeFilter, setCauseFilter] = useState<'ALL' | 'CALIDAD' | ReturnCauseKey>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
-  const [zoomedRow, setZoomedRow] = useState<ComputedReturnRow | null>(null);
-  const [engineerNotes, setEngineerNotes] = useState<Record<string, string>>(
-    {}
-  );
-  const [approvedIds, setApprovedIds] = useState<Record<string, boolean>>({});
+  const [viewMode, setViewMode] = useState<'MATRIX' | 'DETAIL'>('MATRIX');
 
   // Unique dates present in returnRows
   const uniqueDates = useMemo(() => {
@@ -68,7 +83,7 @@ export const ProductionEngineeringView: React.FC<
   const uniqueLots = useMemo(() => {
     const set = new Set<string>();
     returnRows.forEach((r) => {
-      if (r.lotNumber) set.add(r.lotNumber);
+      if (r.lotNumber && r.lotNumber !== 'S/L') set.add(r.lotNumber);
     });
     return Array.from(set).sort();
   }, [returnRows]);
@@ -77,16 +92,16 @@ export const ProductionEngineeringView: React.FC<
   const uniqueProducts = useMemo(() => {
     const map = new Map<string, string>();
     returnRows.forEach((r) => {
-      map.set(r.productId, r.productName);
+      map.set(r.productName, r.productName);
     });
-    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+    return Array.from(map.keys()).sort();
   }, [returnRows]);
 
   const filteredRows = useMemo(() => {
     return returnRows.filter((row) => {
       if (
         selectedProductFilter !== 'ALL' &&
-        row.productId !== selectedProductFilter
+        row.productName !== selectedProductFilter
       ) {
         return false;
       }
@@ -96,11 +111,15 @@ export const ProductionEngineeringView: React.FC<
       if (selectedLotFilter !== 'ALL' && row.lotNumber !== selectedLotFilter) {
         return false;
       }
-      if (responsibilityFilter === 'CALIDAD' && row.qualityValueCOP <= 0) {
-        return false;
-      }
-      if (responsibilityFilter === 'COMERCIAL' && row.commercialValueCOP <= 0) {
-        return false;
+      if (causeFilter === 'CALIDAD') {
+        const qSum =
+          row.causes.lechozo +
+          row.causes.vacio +
+          row.causes.xFecha +
+          row.causes.abomba;
+        if (qSum <= 0) return false;
+      } else if (causeFilter !== 'ALL') {
+        if ((row.causes[causeFilter] || 0) <= 0) return false;
       }
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -109,7 +128,6 @@ export const ProductionEngineeringView: React.FC<
           row.lotNumber.toLowerCase().includes(q) ||
           row.clientName.toLowerCase().includes(q) ||
           row.zoneName.toLowerCase().includes(q) ||
-          (row.technicalDiagnosis || '').toLowerCase().includes(q) ||
           row.observations.toLowerCase().includes(q)
         );
       }
@@ -120,111 +138,542 @@ export const ProductionEngineeringView: React.FC<
     selectedProductFilter,
     selectedDateFilter,
     selectedLotFilter,
-    responsibilityFilter,
+    causeFilter,
     searchQuery,
   ]);
 
-  const summaryMetrics = useMemo(() => {
+  // Aggregate global KPI metrics
+  const globalMetrics = useMemo(() => {
     return filteredRows.reduce(
       (acc, r) => {
         acc.totalUnits += r.qtyToReceive;
         acc.totalCOP += r.totalValueCOP;
         acc.qualityCOP += r.qualityValueCOP;
         acc.commercialCOP += r.commercialValueCOP;
+        acc.lechozoUnits += r.causes.lechozo;
+        acc.vacioUnits += r.causes.vacio;
+        acc.xFechaUnits += r.causes.xFecha;
+        acc.abombaUnits += r.causes.abomba;
+        acc.proxVencerUnits += r.causes.proxVencer;
         return acc;
       },
-      { totalUnits: 0, totalCOP: 0, qualityCOP: 0, commercialCOP: 0 }
+      {
+        totalUnits: 0,
+        totalCOP: 0,
+        qualityCOP: 0,
+        commercialCOP: 0,
+        lechozoUnits: 0,
+        vacioUnits: 0,
+        xFechaUnits: 0,
+        abombaUnits: 0,
+        proxVencerUnits: 0,
+      }
     );
   }, [filteredRows]);
 
-  const handleApproveCard = (row: ComputedReturnRow) => {
-    setApprovedIds((prev) => ({ ...prev, [row.id]: !prev[row.id] }));
-    const note = engineerNotes[row.id]?.trim();
-    if (note) {
-      onUpdateRowEvidence(
-        row.id,
-        row.evidencePhotoUrl || '',
-        note,
-        row.storageTempC ?? 4.0
-      );
-    }
-    toast.success(
-      `Ficha técnica verificada por Ingeniería: Lote L-${row.lotNumber}`,
-      {
-        description: `${row.productName} (${row.date}) marcado como revisado por Producción/Calidad.`,
+  // Consolidate Product vs Cause & Lots Matrix
+  const productMatrix = useMemo<ProductQualitySummary[]>(() => {
+    const map = new Map<string, ProductQualitySummary>();
+
+    for (const r of filteredRows) {
+      const key = r.productName;
+      let entry = map.get(key);
+      if (!entry) {
+        entry = {
+          productId: r.productId,
+          productName: r.productName,
+          totalUnits: 0,
+          qualityUnits: 0,
+          commercialUnits: 0,
+          totalCOP: 0,
+          qualityCOP: 0,
+          commercialCOP: 0,
+          causes: {
+            aCobrar: 0,
+            xFecha: 0,
+            vacio: 0,
+            proxVencer: 0,
+            vencido: 0,
+            abomba: 0,
+            lechozo: 0,
+          },
+          dominantCauseKey: 'lechozo',
+          dominantCauseUnits: 0,
+          lotsMap: new Map(),
+        };
+        map.set(key, entry);
       }
-    );
+
+      const qUnits =
+        r.causes.lechozo + r.causes.vacio + r.causes.xFecha + r.causes.abomba;
+      const cUnits =
+        r.causes.aCobrar + r.causes.proxVencer + r.causes.vencido;
+
+      entry.totalUnits += r.qtyToReceive;
+      entry.qualityUnits += qUnits;
+      entry.commercialUnits += cUnits;
+      entry.totalCOP += r.totalValueCOP;
+      entry.qualityCOP += r.qualityValueCOP;
+      entry.commercialCOP += r.commercialValueCOP;
+
+      entry.causes.aCobrar += r.causes.aCobrar;
+      entry.causes.xFecha += r.causes.xFecha;
+      entry.causes.vacio += r.causes.vacio;
+      entry.causes.proxVencer += r.causes.proxVencer;
+      entry.causes.vencido += r.causes.vencido;
+      entry.causes.abomba += r.causes.abomba;
+      entry.causes.lechozo += r.causes.lechozo;
+
+      if (r.lotNumber && r.lotNumber !== 'S/L') {
+        const lotItem = entry.lotsMap.get(r.lotNumber) || {
+          lot: r.lotNumber,
+          totalUnits: 0,
+          lechozo: 0,
+          vacio: 0,
+          xFecha: 0,
+          abomba: 0,
+          proxVencer: 0,
+        };
+        lotItem.totalUnits += r.qtyToReceive;
+        lotItem.lechozo += r.causes.lechozo;
+        lotItem.vacio += r.causes.vacio;
+        lotItem.xFecha += r.causes.xFecha;
+        lotItem.abomba += r.causes.abomba;
+        lotItem.proxVencer += r.causes.proxVencer;
+        entry.lotsMap.set(r.lotNumber, lotItem);
+      }
+    }
+
+    const list = Array.from(map.values()).map((item) => {
+      const pairs: Array<[ReturnCauseKey, number]> = [
+        ['lechozo', item.causes.lechozo],
+        ['vacio', item.causes.vacio],
+        ['xFecha', item.causes.xFecha],
+        ['abomba', item.causes.abomba],
+        ['proxVencer', item.causes.proxVencer],
+        ['vencido', item.causes.vencido],
+        ['aCobrar', item.causes.aCobrar],
+      ];
+      pairs.sort((a, b) => b[1] - a[1]);
+      item.dominantCauseKey = pairs[0][0];
+      item.dominantCauseUnits = pairs[0][1];
+      return item;
+    });
+
+    // Sort prioritizing quality defects (Lechozo + Vacío) or total units
+    return list.sort((a, b) => {
+      if (causeFilter !== 'ALL' && causeFilter !== 'CALIDAD') {
+        return b.causes[causeFilter] - a.causes[causeFilter];
+      }
+      if (b.qualityUnits !== a.qualityUnits) {
+        return b.qualityUnits - a.qualityUnits;
+      }
+      return b.totalUnits - a.totalUnits;
+    });
+  }, [filteredRows, causeFilter]);
+
+  // Top Critical Quality Alerts (Product + Lot with high Lechosidad or Vacío)
+  const topQualityAlerts = useMemo(() => {
+    const alerts: Array<{
+      productName: string;
+      totalDefectUnits: number;
+      mainDefectLabel: string;
+      mainDefectKey: ReturnCauseKey;
+      qualityCOP: number;
+      topLots: Array<{ lot: string; units: number }>;
+      recommendation: string;
+    }> = [];
+
+    for (const prod of productMatrix) {
+      if (prod.qualityUnits <= 0) continue;
+      const isLechozoMain = prod.causes.lechozo >= prod.causes.vacio;
+      const mainKey: ReturnCauseKey = isLechozoMain ? 'lechozo' : 'vacio';
+      const meta =
+        CAUSE_METADATA.find((c) => c.key === mainKey) || CAUSE_METADATA[3];
+
+      const sortedLots = Array.from(prod.lotsMap.values())
+        .filter((l) => l.lechozo + l.vacio + l.xFecha + l.abomba > 0)
+        .sort(
+          (a, b) =>
+            b.lechozo + b.vacio - (a.lechozo + a.vacio)
+        )
+        .slice(0, 4)
+        .map((l) => ({
+          lot: l.lot,
+          units: l.lechozo + l.vacio + l.xFecha + l.abomba,
+        }));
+
+      alerts.push({
+        productName: prod.productName,
+        totalDefectUnits: prod.qualityUnits,
+        mainDefectLabel: isLechozoMain
+          ? `${prod.causes.lechozo} und por Lechosidad`
+          : `${prod.causes.vacio} und por Pérdida de Vacío`,
+        mainDefectKey: mainKey,
+        qualityCOP: prod.qualityCOP,
+        topLots: sortedLots,
+        recommendation: meta.recommendedAction,
+      });
+    }
+
+    return alerts.slice(0, 4);
+  }, [productMatrix]);
+
+  const handleExportQualityCSV = () => {
+    const headers = [
+      'Producto',
+      'Total Unidades Devueltas',
+      'Unidades Calidad (Planta)',
+      'Unidades Comercial (Ruta)',
+      'Lechoso (Und)',
+      'Vacio (Und)',
+      'Por Fecha (Und)',
+      'Abombamiento (Und)',
+      'Prox. a Vencer (Und)',
+      'Vencido (Und)',
+      'A Cobrar (Und)',
+      'Lotes Criticos',
+      'Costo Calidad COP',
+      'Costo Comercial COP',
+      'Total COP',
+    ];
+
+    const lines = productMatrix.map((p) => {
+      const lotsStr = Array.from(p.lotsMap.values())
+        .sort((a, b) => b.totalUnits - a.totalUnits)
+        .slice(0, 5)
+        .map((l) => `L-${l.lot}(${l.totalUnits}u)`)
+        .join(' / ');
+
+      return [
+        `"${p.productName}"`,
+        p.totalUnits,
+        p.qualityUnits,
+        p.commercialUnits,
+        p.causes.lechozo,
+        p.causes.vacio,
+        p.causes.xFecha,
+        p.causes.abomba,
+        p.causes.proxVencer,
+        p.causes.vencido,
+        p.causes.aCobrar,
+        `"${lotsStr}"`,
+        p.qualityCOP,
+        p.commercialCOP,
+        p.totalCOP,
+      ].join(';');
+    });
+
+    const csv = '\uFEFF' + [headers.join(';'), ...lines].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Informe_Calidad_Lotes_Cardiso_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success('Informe Ejecutivo de Calidad exportado', {
+      description: 'Archivo CSV listo para abrir en Excel.',
+    });
   };
 
   return (
     <div className="space-y-6">
-      {/* Header Banner for Production Engineers */}
-      <div className="rounded-3xl border border-white/20 bg-slate-950/80 backdrop-blur-2xl p-4 sm:p-6 shadow-2xl">
+      {/* Top Executive Header */}
+      <div className="rounded-3xl border border-white/20 bg-slate-950/85 backdrop-blur-2xl p-4 sm:p-6 shadow-2xl">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="space-y-1.5">
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="quality" dot>
-                Módulo Exclusivo · Ingenieras de Producción & Calidad
+                Informe Ejecutivo · Ingeniería de Calidad & Planta
               </Badge>
-              <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-3 py-0.5 text-xs font-medium text-emerald-300">
-                Fichas Visuales de Devolución en Tiempo Real
+              <span className="rounded-full bg-violet-500/15 border border-violet-500/30 px-3 py-0.5 text-xs font-medium text-violet-300">
+                Análisis Automático por Producto, Causa y Lote
               </span>
             </div>
             <h1 className="text-lg sm:text-2xl font-bold tracking-tight text-white">
-              Monitor de Fichas Técnicas de Devolución por Producto, Día y Lote
+              Diagnóstico de Calidad por Producto, Lotes Críticos y Causales
             </h1>
             <p className="text-xs sm:text-sm text-slate-300 max-w-3xl leading-relaxed">
-              Todo lo que los vendedores y puntos de venta suben en su formulario aparece aquí convertido en <strong>fichas técnicas visuales</strong>. Filtra por <strong>Producto (ej. Chorizo)</strong>, por <strong>Día</strong> o por <strong>N° de Lote</strong> para revisar la foto, las 7 causas y el diagnóstico.
+              Reporte consolidado generado directamente desde el Excel de devoluciones. Identifica al instante qué productos y qué <strong>Lotes</strong> presentan mayor incidencia por <strong>Lechosidad</strong>, <strong>Pérdida de Vacío</strong> o <strong>Rotación Comercial</strong>.
             </p>
           </div>
 
-          {/* Summary KPI Pills */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 shrink-0">
-            <div className="rounded-2xl border border-white/15 bg-slate-900/90 px-4 py-2.5">
-              <span className="text-[10px] uppercase tracking-wider text-slate-400">
-                Fichas Filtradas
-              </span>
-              <div className="mt-0.5 text-lg font-bold font-mono text-white">
-                {filteredRows.length} fichas
-              </div>
-              <div className="text-[11px] text-emerald-400 font-mono">
-                {formatNumber(summaryMetrics.totalUnits)} unds
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-sky-500/30 bg-sky-500/10 px-4 py-2.5">
-              <span className="text-[10px] uppercase tracking-wider text-sky-300">
-                Costo Planta / Calidad
-              </span>
-              <div className="mt-0.5 text-lg font-bold font-mono text-sky-300">
-                {formatCOP(summaryMetrics.qualityCOP)}
-              </div>
-              <div className="text-[11px] text-sky-200/80">
-                Lechoso, Vacío, Fecha
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-2.5">
-              <span className="text-[10px] uppercase tracking-wider text-amber-300">
-                Costo Comercial
-              </span>
-              <div className="mt-0.5 text-lg font-bold font-mono text-amber-300">
-                {formatCOP(summaryMetrics.commercialCOP)}
-              </div>
-              <div className="text-[11px] text-amber-200/80">
-                Próx. Vencer, Cobrar
-              </div>
-            </div>
+          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+            {onOpenExcelModal && (
+              <button
+                type="button"
+                onClick={onOpenExcelModal}
+                className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 hover:bg-emerald-500 px-4 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-600/20 transition-all"
+              >
+                <FileSpreadsheet className="h-4 w-4" />
+                Actualizar desde Excel (.xlsx)
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleExportQualityCSV}
+              className="inline-flex items-center gap-2 rounded-2xl border border-white/15 bg-slate-900 hover:bg-slate-800 px-4 py-2.5 text-xs font-semibold text-white transition-all"
+            >
+              <Download className="h-4 w-4 text-sky-400" />
+              Descargar Informe Calidad (Excel)
+            </button>
           </div>
         </div>
 
-        {/* Filter Controls: Product, Date, Lot, Responsibility */}
-        <div className="mt-5 pt-5 border-t border-white/10 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          {/* 1. Filter by Product (e.g., Chorizo) */}
+        {/* 5 Executive KPI Cards */}
+        <div className="mt-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          <div className="rounded-2xl border border-violet-500/35 bg-violet-500/10 p-3.5">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-violet-300">
+              Devolución por Lechosidad
+            </div>
+            <div className="mt-1 text-xl font-bold font-mono text-white">
+              {formatNumber(globalMetrics.lechozoUnits)} und
+            </div>
+            <div className="text-[11px] text-violet-200/80 mt-0.5">
+              Exudado / Choques térmicos
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-sky-500/35 bg-sky-500/10 p-3.5">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-sky-300">
+              Pérdida de Vacío
+            </div>
+            <div className="mt-1 text-xl font-bold font-mono text-white">
+              {formatNumber(globalMetrics.vacioUnits)} und
+            </div>
+            <div className="text-[11px] text-sky-200/80 mt-0.5">
+              Sellado / Empaque termoformado
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-cyan-500/35 bg-cyan-500/10 p-3.5">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-cyan-300">
+              Por Fecha / Abombamiento
+            </div>
+            <div className="mt-1 text-xl font-bold font-mono text-white">
+              {formatNumber(globalMetrics.xFechaUnits + globalMetrics.abombaUnits)} und
+            </div>
+            <div className="text-[11px] text-cyan-200/80 mt-0.5">
+              Marcación / Gasificación
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-emerald-500/35 bg-emerald-500/10 p-3.5">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-emerald-300">
+              Impacto Planta (Calidad)
+            </div>
+            <div className="mt-1 text-lg font-bold font-mono text-emerald-300">
+              {formatCOP(globalMetrics.qualityCOP)}
+            </div>
+            <div className="text-[11px] text-emerald-200/80 mt-0.5">
+              {globalMetrics.totalCOP > 0
+                ? `${formatPercent((globalMetrics.qualityCOP / globalMetrics.totalCOP) * 100)} del total`
+                : '0%'}
+            </div>
+          </div>
+
+          <div className="col-span-2 sm:col-span-1 rounded-2xl border border-amber-500/35 bg-amber-500/10 p-3.5">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-amber-300">
+              Impacto Comercial (Ruta)
+            </div>
+            <div className="mt-1 text-lg font-bold font-mono text-amber-300">
+              {formatCOP(globalMetrics.commercialCOP)}
+            </div>
+            <div className="text-[11px] text-amber-200/80 mt-0.5">
+              Próx. Vencer: {formatNumber(globalMetrics.proxVencerUnits)} und
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Radar of Critical Products & Lots (Semáforo de Calidad) */}
+      {topQualityAlerts.length > 0 && (
+        <div className="rounded-3xl border border-violet-500/30 bg-slate-950/85 backdrop-blur-2xl p-4 sm:p-6 shadow-xl">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+            <div className="flex items-center gap-2">
+              <ShieldAlert className="h-5 w-5 text-violet-400" />
+              <h2 className="text-sm sm:text-base font-bold text-white">
+                Semáforo de Productos Críticos en Planta (Mayor Devolución por Lechosidad y Vacío)
+              </h2>
+            </div>
+            <span className="text-xs text-slate-400">
+              Haz clic en cualquier tarjeta o lote para filtrar su trazabilidad
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3.5">
+            {topQualityAlerts.map((alert, idx) => (
+              <div
+                key={alert.productName}
+                onClick={() =>
+                  setSelectedProductFilter(
+                    selectedProductFilter === alert.productName
+                      ? 'ALL'
+                      : alert.productName
+                  )
+                }
+                className={`cursor-pointer rounded-2xl border p-4 transition-all ${
+                  selectedProductFilter === alert.productName
+                    ? 'border-violet-400 bg-violet-950/50 shadow-lg shadow-violet-500/20'
+                    : 'border-white/15 bg-slate-900/80 hover:border-violet-400/50'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="inline-flex items-center gap-1 rounded-lg bg-rose-500/20 border border-rose-500/30 px-2 py-0.5 text-[10px] font-bold text-rose-300">
+                    #{idx + 1} Crítico Planta
+                  </span>
+                  <span className="font-mono text-xs font-bold text-violet-300">
+                    {formatCOP(alert.qualityCOP)}
+                  </span>
+                </div>
+
+                <h3 className="mt-2 text-sm font-bold text-white leading-snug">
+                  {alert.productName}
+                </h3>
+
+                <div className="mt-1.5 flex items-center gap-2 text-xs font-semibold text-amber-300">
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                  <span>{alert.mainDefectLabel}</span>
+                </div>
+
+                {/* Lots involved */}
+                <div className="mt-3 pt-2.5 border-t border-white/10">
+                  <div className="text-[10px] uppercase tracking-wider text-slate-400 mb-1.5">
+                    Lotes más afectados:
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {alert.topLots.length > 0 ? (
+                      alert.topLots.map((l) => (
+                        <button
+                          key={l.lot}
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedLotFilter(
+                              selectedLotFilter === l.lot ? 'ALL' : l.lot
+                            );
+                          }}
+                          className={`rounded-lg px-2 py-0.5 font-mono text-[11px] font-bold border transition-all ${
+                            selectedLotFilter === l.lot
+                              ? 'bg-emerald-500 text-slate-950 border-emerald-300'
+                              : 'bg-slate-950 text-emerald-300 border-emerald-500/30 hover:border-emerald-400'
+                          }`}
+                        >
+                          Lote #{l.lot} ({l.units}u)
+                        </button>
+                      ))
+                    ) : (
+                      <span className="text-[11px] text-slate-500">Sin lote</span>
+                    )}
+                  </div>
+                </div>
+
+                <p className="mt-2.5 text-[11px] text-slate-300 line-clamp-2 leading-relaxed">
+                  {alert.recommendation}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Filter Toolbar & Quick Cause Pills */}
+      <div className="rounded-3xl border border-white/15 bg-slate-950/85 backdrop-blur-2xl p-4 sm:p-5 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {/* Quick Cause Filter Buttons */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setCauseFilter('ALL')}
+              className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
+                causeFilter === 'ALL'
+                  ? 'bg-emerald-500 text-slate-950 shadow-sm font-bold'
+                  : 'bg-slate-900 text-slate-300 border border-white/10 hover:bg-slate-800'
+              }`}
+            >
+              Todas las Causas
+            </button>
+            <button
+              type="button"
+              onClick={() => setCauseFilter('CALIDAD')}
+              className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
+                causeFilter === 'CALIDAD'
+                  ? 'bg-sky-500 text-slate-950 shadow-sm font-bold'
+                  : 'bg-slate-900 text-sky-300 border border-sky-500/30 hover:bg-slate-800'
+              }`}
+            >
+              🔬 Solo Defectos Planta (Calidad)
+            </button>
+            <button
+              type="button"
+              onClick={() => setCauseFilter('lechozo')}
+              className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
+                causeFilter === 'lechozo'
+                  ? 'bg-violet-500 text-white shadow-sm font-bold'
+                  : 'bg-slate-900 text-violet-300 border border-violet-500/30 hover:bg-slate-800'
+              }`}
+            >
+              🟣 Solo Lechosidad ({globalMetrics.lechozoUnits})
+            </button>
+            <button
+              type="button"
+              onClick={() => setCauseFilter('vacio')}
+              className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
+                causeFilter === 'vacio'
+                  ? 'bg-sky-600 text-white shadow-sm font-bold'
+                  : 'bg-slate-900 text-sky-300 border border-sky-500/30 hover:bg-slate-800'
+              }`}
+            >
+              🔵 Solo Pérdida de Vacío ({globalMetrics.vacioUnits})
+            </button>
+            <button
+              type="button"
+              onClick={() => setCauseFilter('proxVencer')}
+              className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
+                causeFilter === 'proxVencer'
+                  ? 'bg-amber-500 text-slate-950 shadow-sm font-bold'
+                  : 'bg-slate-900 text-amber-300 border border-amber-500/30 hover:bg-slate-800'
+              }`}
+            >
+              🟠 Próx. a Vencer ({globalMetrics.proxVencerUnits})
+            </button>
+          </div>
+
+          {/* View Mode Switcher */}
+          <div className="inline-flex rounded-xl border border-white/15 bg-slate-900 p-1">
+            <button
+              type="button"
+              onClick={() => setViewMode('MATRIX')}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                viewMode === 'MATRIX'
+                  ? 'bg-indigo-600 text-white shadow-sm'
+                  : 'text-slate-300 hover:text-white'
+              }`}
+            >
+              <BarChart3 className="h-3.5 w-3.5" />
+              Matriz Consolidada por Producto ({productMatrix.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('DETAIL')}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                viewMode === 'DETAIL'
+                  ? 'bg-indigo-600 text-white shadow-sm'
+                  : 'text-slate-300 hover:text-white'
+              }`}
+            >
+              <Layers className="h-3.5 w-3.5" />
+              Trazabilidad Detallada ({filteredRows.length} filas)
+            </button>
+          </div>
+        </div>
+
+        {/* Search & Dropdown Filters */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2 border-t border-white/10">
           <div>
-            <label className="block text-[11px] font-medium text-slate-300 mb-1 flex items-center gap-1.5">
-              <Package className="h-3.5 w-3.5 text-emerald-400" />
-              1. Filtrar por Producto (ej. Chorizo)
+            <label className="block text-[11px] font-medium text-slate-300 mb-1">
+              Filtrar por Producto
             </label>
             <select
               value={selectedProductFilter}
@@ -234,39 +683,17 @@ export const ProductionEngineeringView: React.FC<
               <option value="ALL">
                 Todos los Productos ({uniqueProducts.length})
               </option>
-              {uniqueProducts.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
+              {uniqueProducts.map((name) => (
+                <option key={name} value={name}>
+                  {name}
                 </option>
               ))}
             </select>
           </div>
 
-          {/* 2. Filter by Date */}
           <div>
-            <label className="block text-[11px] font-medium text-slate-300 mb-1 flex items-center gap-1.5">
-              <Calendar className="h-3.5 w-3.5 text-indigo-400" />
-              2. Filtrar por Día / Fecha Recepción
-            </label>
-            <select
-              value={selectedDateFilter}
-              onChange={(e) => setSelectedDateFilter(e.target.value)}
-              className="w-full rounded-xl border border-white/15 bg-slate-900 px-3 py-2 font-mono text-xs text-white focus:border-indigo-400 focus:outline-none"
-            >
-              <option value="ALL">Todos los Días ({uniqueDates.length})</option>
-              {uniqueDates.map((d) => (
-                <option key={d} value={d}>
-                  Día: {d}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* 3. Filter by Lot */}
-          <div>
-            <label className="block text-[11px] font-medium text-slate-300 mb-1 flex items-center gap-1.5">
-              <Tag className="h-3.5 w-3.5 text-amber-400" />
-              3. Filtrar por N° de Lote (Col E)
+            <label className="block text-[11px] font-medium text-slate-300 mb-1">
+              Filtrar por N° de Lote
             </label>
             <select
               value={selectedLotFilter}
@@ -282,49 +709,40 @@ export const ProductionEngineeringView: React.FC<
             </select>
           </div>
 
-          {/* 4. Filter by Area Responsibility */}
           <div>
-            <label className="block text-[11px] font-medium text-slate-300 mb-1 flex items-center gap-1.5">
-              <FlaskConical className="h-3.5 w-3.5 text-sky-400" />
-              4. Tipo de Causa
+            <label className="block text-[11px] font-medium text-slate-300 mb-1">
+              Filtrar por Fecha
             </label>
             <select
-              value={responsibilityFilter}
-              onChange={(e) =>
-                setResponsibilityFilter(
-                  e.target.value as 'ALL' | 'CALIDAD' | 'COMERCIAL'
-                )
-              }
-              className="w-full rounded-xl border border-white/15 bg-slate-900 px-3 py-2 text-xs text-white focus:border-sky-400 focus:outline-none"
+              value={selectedDateFilter}
+              onChange={(e) => setSelectedDateFilter(e.target.value)}
+              className="w-full rounded-xl border border-white/15 bg-slate-900 px-3 py-2 font-mono text-xs text-white focus:border-indigo-400 focus:outline-none"
             >
-              <option value="ALL">Todas (Calidad + Comercial)</option>
-              <option value="CALIDAD">
-                Solo Planta / Calidad (Lechoso, Vacío, Fecha, Abomba)
-              </option>
-              <option value="COMERCIAL">
-                Solo Comercial (Próx. Vencer, A Cobrar, Vencido)
-              </option>
+              <option value="ALL">Todas las Fechas ({uniqueDates.length})</option>
+              {uniqueDates.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
             </select>
           </div>
 
-          {/* 5. Free Search */}
           <div>
-            <label className="block text-[11px] font-medium text-slate-300 mb-1 flex items-center gap-1.5">
-              <Search className="h-3.5 w-3.5 text-slate-400" />
-              5. Búsqueda Rápida
+            <label className="block text-[11px] font-medium text-slate-300 mb-1">
+              Búsqueda por Producto, Lote o Cliente
             </label>
             <div className="flex gap-1.5">
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Ej. Chorizo, 259, Sabaneta..."
+                placeholder="Ej. Chorizo Carla, 281, 290..."
                 className="w-full rounded-xl border border-white/15 bg-slate-900 px-3 py-2 text-xs text-white placeholder:text-slate-500 focus:border-indigo-400 focus:outline-none"
               />
               {(selectedProductFilter !== 'ALL' ||
                 selectedDateFilter !== 'ALL' ||
                 selectedLotFilter !== 'ALL' ||
-                responsibilityFilter !== 'ALL' ||
+                causeFilter !== 'ALL' ||
                 searchQuery) && (
                 <button
                   type="button"
@@ -332,7 +750,7 @@ export const ProductionEngineeringView: React.FC<
                     setSelectedProductFilter('ALL');
                     setSelectedDateFilter('ALL');
                     setSelectedLotFilter('ALL');
-                    setResponsibilityFilter('ALL');
+                    setCauseFilter('ALL');
                     setSearchQuery('');
                   }}
                   title="Limpiar filtros"
@@ -346,361 +764,304 @@ export const ProductionEngineeringView: React.FC<
         </div>
       </div>
 
-      {/* Grid of Beautiful Inspection Cards (Exact design from user's screenshot) */}
+      {/* Main Content: Consolidated Product Matrix OR Detailed Rows */}
       {filteredRows.length === 0 ? (
         <div className="rounded-3xl border border-white/15 bg-slate-950/80 p-8 backdrop-blur-2xl">
           <EmptyState
             icon={FlaskConical}
-            title="No hay fichas de devolución para este filtro"
-            description="Cambia el producto, fecha o lote seleccionado para ver las tarjetas técnicas con foto."
-            actionLabel="Mostrar Todas las Fichas"
+            title="No se encontraron devoluciones para este filtro"
+            description="Limpia los filtros activos para visualizar todos los productos y lotes."
+            actionLabel="Restablecer Filtros"
             onAction={() => {
               setSelectedProductFilter('ALL');
               setSelectedDateFilter('ALL');
               setSelectedLotFilter('ALL');
-              setResponsibilityFilter('ALL');
+              setCauseFilter('ALL');
               setSearchQuery('');
             }}
           />
         </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-          {filteredRows.map((row) => {
-            const primaryCauseMeta =
-              CAUSE_METADATA.find((c) => c.key === row.primaryCauseKey) ||
-              CAUSE_METADATA[3];
-            const isApproved = Boolean(approvedIds[row.id]);
-
-            return (
-              <div
-                key={row.id}
-                className="rounded-3xl border border-white/20 bg-neutral-950/90 backdrop-blur-2xl p-5 sm:p-6 shadow-[0_20px_50px_rgba(0,0,0,0.6)] flex flex-col justify-between space-y-4 transition-all hover:border-indigo-400/40"
-              >
-                {/* Card Top Header: Product, Date, Lot, Zone & Client */}
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between border-b border-neutral-800 pb-4">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-500/20 border border-emerald-500/30 px-2.5 py-0.5 font-mono text-xs font-bold text-emerald-300">
-                        Lote #{row.lotNumber}
-                      </span>
-                      <span className="inline-flex items-center gap-1 rounded-lg bg-indigo-500/20 border border-indigo-500/30 px-2.5 py-0.5 font-mono text-xs font-semibold text-indigo-300">
-                        <Calendar className="h-3 w-3" />
-                        Día: {row.date}
-                      </span>
-                      <span className="text-[11px] font-mono text-neutral-400">
-                        Vence: {row.productExpiryDate}
-                      </span>
-                    </div>
-
-                    <h3 className="mt-2 text-base sm:text-lg font-bold text-white tracking-tight">
-                      {row.productName} — {row.zoneName}
-                    </h3>
-                    <p className="text-xs text-neutral-400 flex flex-wrap items-center gap-2 mt-0.5">
-                      <span>
-                        Cliente / Sede:{' '}
-                        <strong className="text-neutral-200">
-                          {row.clientName}
-                        </strong>
-                      </span>
-                      <span>·</span>
-                      <span>
-                        Costo Unitario:{' '}
-                        <strong className="font-mono text-indigo-300">
-                          {formatCOP(row.unitCost)}
-                        </strong>
-                      </span>
-                      {row.storageTempC !== undefined && (
-                        <>
-                          <span>·</span>
-                          <span
-                            className={`inline-flex items-center gap-0.5 font-mono font-semibold ${
-                              row.storageTempC > 5
-                                ? 'text-rose-400'
-                                : 'text-emerald-400'
-                            }`}
-                          >
-                            <Thermometer className="h-3 w-3" />
-                            Recepción: {row.storageTempC}°C
-                          </span>
-                        </>
-                      )}
-                    </p>
-                  </div>
-
-                  {isApproved ? (
-                    <Badge variant="success" dot>
-                      Revisado Ingeniería
-                    </Badge>
-                  ) : (
-                    <Badge
-                      variant={
-                        primaryCauseMeta.responsibility === 'CALIDAD'
-                          ? 'quality'
-                          : 'commercial'
-                      }
-                      dot
-                    >
-                      {primaryCauseMeta.responsibility === 'CALIDAD'
-                        ? 'Planta / Calidad'
-                        : 'Comercial'}
-                    </Badge>
-                  )}
-                </div>
-
-                {/* Section 1: Exact "Clasificación por Causa de Devolución (Cols G a M)" Box from Screenshot */}
-                <div className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-neutral-100">
-                      Clasificación por Causa de Devolución (Cols G a M)
-                    </span>
-                    <Badge
-                      variant={
-                        row.reconciliationStatus === 'REVISAR'
-                          ? 'warning'
-                          : 'success'
-                      }
-                      dot
-                    >
-                      {row.reconciliationStatus === 'REVISAR'
-                        ? `REVISAR (${row.totalClassifiedUnits} de ${row.qtyToReceive} und)`
-                        : `CUADRADO (${row.totalClassifiedUnits} = ${row.qtyToReceive} und)`}
-                    </Badge>
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                    {CAUSE_METADATA.map((c) => {
-                      const units = row.causes[c.key];
-                      const cop = row.copByCause[c.key];
-                      const isActive = units > 0;
-
-                      return (
-                        <div
-                          key={c.key}
-                          className={`rounded-xl border p-2.5 transition-all ${
-                            isActive
-                              ? 'border-indigo-500/60 bg-indigo-950/40 shadow-sm'
-                              : 'border-neutral-800/90 bg-neutral-950/60 opacity-75'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between text-[11px] font-medium text-neutral-300 mb-1">
-                            <span className="truncate">{c.shortLabel}</span>
-                            <span
-                              className={`text-[10px] font-semibold ${
-                                c.responsibility === 'COMERCIAL'
-                                  ? 'text-amber-400'
-                                  : 'text-sky-400'
-                              }`}
-                            >
-                              {c.responsibility === 'COMERCIAL'
-                                ? 'Com.'
-                                : 'Cal.'}
-                            </span>
-                          </div>
-                          <div
-                            className={`w-full rounded-lg border px-2.5 py-1.5 font-mono text-xs font-bold ${
-                              isActive
-                                ? 'border-indigo-400/50 bg-neutral-950 text-white'
-                                : 'border-neutral-800 bg-neutral-950 text-neutral-500'
-                            }`}
-                          >
-                            {units}
-                          </div>
-                          <div
-                            className={`mt-1 text-right font-mono text-[10px] ${
-                              isActive
-                                ? 'text-indigo-300 font-semibold'
-                                : 'text-neutral-500'
-                            }`}
-                          >
-                            {formatCOP(cop)}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* Blue Technical Ficha Box (Exact style from screenshot) */}
-                  <div className="rounded-xl border border-indigo-500/30 bg-indigo-950/40 p-3 text-xs">
-                    <div className="font-semibold text-indigo-300">
-                      Ficha Técnica de la Causa ({primaryCauseMeta.fullLabel}):
-                    </div>
-                    <p className="mt-0.5 text-[11px] text-slate-200 leading-relaxed">
-                      {primaryCauseMeta.technicalExplanation}
-                    </p>
-                    <p className="mt-1 text-[11px] text-emerald-300">
-                      <strong>Acción sugerida para Ingeniería:</strong>{' '}
-                      {primaryCauseMeta.recommendedAction}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Section 2: Exact "Evidencia Fotográfica del Producto Devuelto" Box from Screenshot */}
-                <div className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                    {/* Clickable Photo with Zoom Icon */}
-                    <button
-                      type="button"
-                      onClick={() => setZoomedRow(row)}
-                      className="group relative h-28 w-full sm:w-36 shrink-0 overflow-hidden rounded-xl border border-white/15 bg-slate-900"
-                      title="Haz clic para ver la evidencia fotográfica en pantalla completa"
-                    >
-                      <img
-                        src={
-                          row.evidencePhotoUrl ||
-                          'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=900&q=80'
-                        }
-                        alt={row.productName}
-                        className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      />
-                      <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors flex items-center justify-center">
-                        <span className="inline-flex items-center gap-1 rounded-lg bg-black/70 px-2 py-1 text-[10px] font-semibold text-white">
-                          <Maximize2 className="h-3 w-3" />
-                          Ampliar Foto
-                        </span>
-                      </div>
-                    </button>
-
-                    <div className="flex-1 space-y-2">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div>
-                          <div className="text-xs font-semibold text-white">
-                            Evidencia Fotográfica y Diagnóstico del Producto Devuelto
-                          </div>
-                          <p className="text-[11px] text-neutral-400">
-                            Subido por: <strong className="text-neutral-200">{row.createdBy}</strong> · Ruta {row.zoneId}
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setZoomedRow(row)}
-                          className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white transition-all"
-                        >
-                          <Camera className="h-3.5 w-3.5" />
-                          Inspeccionar Foto
-                        </button>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        <div className="rounded-xl border border-neutral-800 bg-neutral-950 px-3 py-2 text-xs text-neutral-200">
-                          <span className="block text-[10px] uppercase tracking-wider text-neutral-500">
-                            Diagnóstico Recepción / Calidad
-                          </span>
-                          <span className="font-medium">
-                            {row.technicalDiagnosis ||
-                              'Sin nota técnica adicional.'}
-                          </span>
-                        </div>
-                        <div className="rounded-xl border border-neutral-800 bg-neutral-950 px-3 py-2 text-xs text-neutral-200">
-                          <span className="block text-[10px] uppercase tracking-wider text-neutral-500">
-                            Observación / Factura (Col P)
-                          </span>
-                          <span className="font-medium">
-                            {row.observations || 'Sin observaciones'}
-                            {row.invoiceRef ? ` · ${row.invoiceRef}` : ''}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Card Footer: Total Monetary Impact + Production Engineer Sign-Off */}
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-t border-neutral-800 pt-3">
-                  <div className="text-xs text-neutral-400">
-                    Impacto Monetario Total:{' '}
-                    <strong className="font-mono text-base text-white">
-                      {formatCOP(row.totalValueCOP)}
-                    </strong>{' '}
-                    <span className="text-[11px] text-neutral-500">
-                      ({row.qtyToReceive} und × {formatCOP(row.unitCost)})
-                    </span>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
-                    <input
-                      type="text"
-                      value={engineerNotes[row.id] ?? ''}
-                      onChange={(e) =>
-                        setEngineerNotes((prev) => ({
-                          ...prev,
-                          [row.id]: e.target.value,
-                        }))
-                      }
-                      placeholder="Nota de Ing. de Producción..."
-                      className="w-full sm:w-52 rounded-xl border border-neutral-800 bg-neutral-900 px-3 py-2 sm:py-1.5 text-xs text-white placeholder:text-neutral-500 focus:border-emerald-500 focus:outline-none"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleApproveCard(row)}
-                      className={`inline-flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all ${
-                        isApproved
-                          ? 'bg-emerald-600 text-white'
-                          : 'bg-indigo-600 hover:bg-indigo-500 text-white'
-                      }`}
-                    >
-                      <ClipboardCheck className="h-3.5 w-3.5" />
-                      {isApproved ? 'Dictamen Guardado' : 'Aprobar Revisión'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Fullscreen Photo & Ficha Zoom Modal */}
-      <Modal
-        open={Boolean(zoomedRow)}
-        onClose={() => setZoomedRow(null)}
-        title={
-          zoomedRow
-            ? `${zoomedRow.productName} — Lote #${zoomedRow.lotNumber} (Día: ${zoomedRow.date})`
-            : ''
-        }
-        subtitle={
-          zoomedRow
-            ? `Ruta: ${zoomedRow.zoneName} · Cliente: ${zoomedRow.clientName} · Temperatura: ${zoomedRow.storageTempC ?? 4.0}°C`
-            : ''
-        }
-        maxWidthClass="max-w-3xl"
-      >
-        {zoomedRow && (
-          <div className="space-y-4">
-            <div className="overflow-hidden rounded-2xl border border-white/15 bg-black max-h-[420px] flex items-center justify-center">
-              <img
-                src={
-                  zoomedRow.evidencePhotoUrl ||
-                  'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=1200&q=85'
-                }
-                alt={zoomedRow.productName}
-                className="max-h-[420px] w-full object-contain"
-              />
+      ) : viewMode === 'MATRIX' ? (
+        <div className="rounded-3xl border border-white/20 bg-slate-950/90 backdrop-blur-2xl overflow-hidden shadow-2xl">
+          <div className="px-5 py-4 border-b border-white/10 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="text-sm sm:text-base font-bold text-white">
+                Matriz Consolidada Producto vs. Causa de Devolución y Lotes
+              </h3>
+              <p className="text-xs text-slate-400">
+                Haz clic en cualquier fila para ver el detalle de clientes y rutas que devolvieron ese producto.
+              </p>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-              <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-3">
-                <div className="text-neutral-400 font-medium">
-                  Diagnóstico Registrado:
-                </div>
-                <div className="mt-1 text-white">
-                  {zoomedRow.technicalDiagnosis}
-                </div>
-              </div>
-              <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-3">
-                <div className="text-neutral-400 font-medium">
-                  Observaciones y Costo Total:
-                </div>
-                <div className="mt-1 text-white">
-                  {zoomedRow.observations} —{' '}
-                  <strong className="font-mono text-emerald-400">
-                    {formatCOP(zoomedRow.totalValueCOP)}
-                  </strong>
-                </div>
+            <Badge variant="indigo">
+              {productMatrix.length} productos analizados
+            </Badge>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="border-b border-white/10 bg-slate-900/90 text-[10px] uppercase tracking-wider text-slate-400">
+                  <th className="py-3 px-4">Producto</th>
+                  <th className="py-3 px-3 text-right">Total Dev.</th>
+                  <th className="py-3 px-3">Causa Principal & %</th>
+                  <th className="py-3 px-2.5 text-center text-violet-300">
+                    Lechoso
+                  </th>
+                  <th className="py-3 px-2.5 text-center text-sky-300">
+                    Vacío
+                  </th>
+                  <th className="py-3 px-2.5 text-center text-cyan-300">
+                    Fecha / Abom
+                  </th>
+                  <th className="py-3 px-2.5 text-center text-amber-300">
+                    Próx. Vencer
+                  </th>
+                  <th className="py-3 px-2.5 text-center text-rose-300">
+                    Cobrar / Venc
+                  </th>
+                  <th className="py-3 px-3">Lotes Afectados (Clic para filtrar)</th>
+                  <th className="py-3 px-4 text-right">Costo Calidad</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/10">
+                {productMatrix.map((prod) => {
+                  const dominantMeta =
+                    CAUSE_METADATA.find(
+                      (c) => c.key === prod.dominantCauseKey
+                    ) || CAUSE_METADATA[3];
+                  const pctDominant =
+                    prod.totalUnits > 0
+                      ? Math.round(
+                          (prod.dominantCauseUnits / prod.totalUnits) * 100
+                        )
+                      : 0;
+
+                  const topLots = Array.from(prod.lotsMap.values())
+                    .sort((a, b) => b.totalUnits - a.totalUnits)
+                    .slice(0, 5);
+
+                  return (
+                    <tr
+                      key={prod.productName}
+                      onClick={() => {
+                        setSelectedProductFilter(prod.productName);
+                        setViewMode('DETAIL');
+                      }}
+                      className="hover:bg-white/[0.04] transition-colors cursor-pointer"
+                    >
+                      <td className="py-3 px-4 font-bold text-white">
+                        <div className="flex items-center gap-2">
+                          <span>{prod.productName}</span>
+                          <ArrowUpRight className="h-3.5 w-3.5 text-slate-500" />
+                        </div>
+                      </td>
+
+                      <td className="py-3 px-3 text-right font-mono font-bold text-white">
+                        {formatNumber(prod.totalUnits)} und
+                      </td>
+
+                      <td className="py-3 px-3">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-[10px] font-bold ${dominantMeta.badgeClass}`}
+                          >
+                            {dominantMeta.shortLabel} ({pctDominant}%)
+                          </span>
+                        </div>
+                      </td>
+
+                      <td className="py-3 px-2.5 text-center font-mono">
+                        {prod.causes.lechozo > 0 ? (
+                          <span className="inline-block rounded-md bg-violet-500/20 border border-violet-500/40 px-2 py-0.5 font-bold text-violet-300">
+                            {prod.causes.lechozo}
+                          </span>
+                        ) : (
+                          <span className="text-slate-600">-</span>
+                        )}
+                      </td>
+
+                      <td className="py-3 px-2.5 text-center font-mono">
+                        {prod.causes.vacio > 0 ? (
+                          <span className="inline-block rounded-md bg-sky-500/20 border border-sky-500/40 px-2 py-0.5 font-bold text-sky-300">
+                            {prod.causes.vacio}
+                          </span>
+                        ) : (
+                          <span className="text-slate-600">-</span>
+                        )}
+                      </td>
+
+                      <td className="py-3 px-2.5 text-center font-mono">
+                        {prod.causes.xFecha + prod.causes.abomba > 0 ? (
+                          <span className="inline-block rounded-md bg-cyan-500/20 border border-cyan-500/40 px-2 py-0.5 font-bold text-cyan-300">
+                            {prod.causes.xFecha + prod.causes.abomba}
+                          </span>
+                        ) : (
+                          <span className="text-slate-600">-</span>
+                        )}
+                      </td>
+
+                      <td className="py-3 px-2.5 text-center font-mono">
+                        {prod.causes.proxVencer > 0 ? (
+                          <span className="inline-block rounded-md bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 font-semibold text-amber-300">
+                            {prod.causes.proxVencer}
+                          </span>
+                        ) : (
+                          <span className="text-slate-600">-</span>
+                        )}
+                      </td>
+
+                      <td className="py-3 px-2.5 text-center font-mono">
+                        {prod.causes.aCobrar + prod.causes.vencido > 0 ? (
+                          <span className="inline-block rounded-md bg-rose-500/15 border border-rose-500/30 px-2 py-0.5 font-semibold text-rose-300">
+                            {prod.causes.aCobrar + prod.causes.vencido}
+                          </span>
+                        ) : (
+                          <span className="text-slate-600">-</span>
+                        )}
+                      </td>
+
+                      <td
+                        className="py-3 px-3"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="flex flex-wrap gap-1">
+                          {topLots.length > 0 ? (
+                            topLots.map((l) => (
+                              <button
+                                key={l.lot}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedLotFilter(
+                                    selectedLotFilter === l.lot ? 'ALL' : l.lot
+                                  );
+                                }}
+                                className={`rounded-md px-1.5 py-0.5 font-mono text-[10px] font-semibold border transition-all ${
+                                  selectedLotFilter === l.lot
+                                    ? 'bg-emerald-500 text-slate-950 border-emerald-300 font-bold'
+                                    : 'bg-slate-900 text-emerald-300 border-white/10 hover:border-emerald-400/50'
+                                }`}
+                              >
+                                L-{l.lot} ({l.totalUnits}u)
+                              </button>
+                            ))
+                          ) : (
+                            <span className="text-[11px] text-slate-500">
+                              S/L
+                            </span>
+                          )}
+                        </div>
+                      </td>
+
+                      <td className="py-3 px-4 text-right font-mono">
+                        <div className="font-bold text-sky-300">
+                          {formatCOP(prod.qualityCOP)}
+                        </div>
+                        <div className="text-[10px] text-slate-400">
+                          Total: {formatCOP(prod.totalCOP)}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        /* Detailed Row-by-Row Traceability Table */
+        <div className="rounded-3xl border border-white/20 bg-slate-950/90 backdrop-blur-2xl overflow-hidden shadow-2xl">
+          <div className="px-5 py-4 border-b border-white/10 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setViewMode('MATRIX')}
+                className="rounded-xl border border-white/15 bg-slate-900 hover:bg-slate-800 px-3 py-1.5 text-xs font-semibold text-emerald-300"
+              >
+                ← Volver a Matriz Consolidada
+              </button>
+              <div>
+                <h3 className="text-sm sm:text-base font-bold text-white">
+                  Trazabilidad Detallada por Lote, Vendedor y Cliente
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Mostrando {filteredRows.length} registros individuales de devolución
+                </p>
               </div>
             </div>
           </div>
-        )}
-      </Modal>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="border-b border-white/10 bg-slate-900/90 text-[10px] uppercase tracking-wider text-slate-400">
+                  <th className="py-3 px-3">Fecha</th>
+                  <th className="py-3 px-3">Zona / Vendedor</th>
+                  <th className="py-3 px-3">Cliente</th>
+                  <th className="py-3 px-3">Producto</th>
+                  <th className="py-3 px-2.5 text-center">Lote</th>
+                  <th className="py-3 px-2.5 text-center">Vencimiento</th>
+                  <th className="py-3 px-2.5 text-center">Cant.</th>
+                  <th className="py-3 px-3">Causa Registrada</th>
+                  <th className="py-3 px-3">Diagnóstico / Observación</th>
+                  <th className="py-3 px-3 text-right">Valor Total</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/10">
+                {filteredRows.map((row) => {
+                  const causeMeta =
+                    CAUSE_METADATA.find(
+                      (c) => c.key === row.primaryCauseKey
+                    ) || CAUSE_METADATA[3];
+
+                  return (
+                    <tr
+                      key={row.id}
+                      className="hover:bg-white/[0.03] transition-colors"
+                    >
+                      <td className="py-2.5 px-3 font-mono text-slate-300 whitespace-nowrap">
+                        {row.date}
+                      </td>
+                      <td className="py-2.5 px-3 font-semibold text-emerald-300">
+                        {row.zoneName}
+                      </td>
+                      <td className="py-2.5 px-3 text-slate-200">
+                        {row.clientName}
+                      </td>
+                      <td className="py-2.5 px-3 font-bold text-white">
+                        {row.productName}
+                      </td>
+                      <td className="py-2.5 px-2.5 text-center font-mono">
+                        <span className="rounded-md bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 font-bold text-emerald-300">
+                          L-{row.lotNumber}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-2.5 text-center font-mono text-slate-400 whitespace-nowrap">
+                        {row.productExpiryDate}
+                      </td>
+                      <td className="py-2.5 px-2.5 text-center font-mono font-bold text-white">
+                        {row.qtyToReceive}
+                      </td>
+                      <td className="py-2.5 px-3">
+                        <span
+                          className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-[10px] font-bold ${causeMeta.badgeClass}`}
+                        >
+                          {causeMeta.shortLabel}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 text-slate-300 max-w-xs truncate">
+                        {row.observations || causeMeta.technicalExplanation}
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-mono font-bold text-white whitespace-nowrap">
+                        {formatCOP(row.totalValueCOP)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

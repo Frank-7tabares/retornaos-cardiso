@@ -258,6 +258,130 @@ function retornaMysqlBridgePlugin(): Plugin {
           return;
         }
 
+        // 2B. POST /api/mysql/returns/bulk -> Sincronización masiva desde Excel HGI (.xlsx)
+        if (req.method === 'POST' && req.url === '/api/mysql/returns/bulk') {
+          const body = await readBody();
+          const items = Array.isArray(body?.items) ? body.items : [];
+          const clearDemo = body?.clearDemo !== false;
+          const replaceAll = Boolean(body?.replaceAll);
+
+          if (items.length === 0) {
+            res.statusCode = 400;
+            res.end(JSON.stringify({ ok: false, error: 'Sin filas para sincronizar' }));
+            return;
+          }
+
+          const sqlParts: string[] = [];
+          if (replaceAll) {
+            sqlParts.push('DELETE FROM devoluciones_detalle;');
+          } else if (clearDemo) {
+            sqlParts.push("DELETE FROM devoluciones_detalle WHERE id LIKE 'ret-%';");
+          }
+
+          const chunkSize = 80;
+          for (let i = 0; i < items.length; i += chunkSize) {
+            const chunk = items.slice(i, i + chunkSize);
+            const valuesRows = chunk.map((item: any) => {
+              const c = item.causes || {};
+              const unitCost = Number(item.unitCost) || 0;
+              const commUnits =
+                (Number(c.aCobrar) || 0) +
+                (Number(c.proxVencer) || 0) +
+                (Number(c.vencido) || 0);
+              const qualUnits =
+                (Number(c.vacio) || 0) +
+                (Number(c.xFecha) || 0) +
+                (Number(c.abomba) || 0) +
+                (Number(c.lechozo) || 0);
+              const totalUnits = commUnits + qualUnits;
+              const status =
+                Number(item.qtyToReceive) === totalUnits ? 'CUADRADO' : 'REVISAR';
+
+              return `(
+                ${sqlEscape(item.id)},
+                ${sqlEscape(item.date)},
+                ${sqlEscape(item.zoneId)},
+                ${sqlEscape(item.zoneName)},
+                ${sqlEscape(item.clientName)},
+                ${sqlEscape(item.productId)},
+                ${sqlEscape(item.productName)},
+                ${Number(item.qtyToReceive) || 1},
+                ${sqlEscape(item.lotNumber || 'S/L')},
+                ${sqlEscape(item.productExpiryDate || item.date)},
+                ${Number(c.aCobrar) || 0},
+                ${Number(c.xFecha) || 0},
+                ${Number(c.vacio) || 0},
+                ${Number(c.proxVencer) || 0},
+                ${Number(c.vencido) || 0},
+                ${Number(c.abomba) || 0},
+                ${Number(c.lechozo) || 0},
+                ${unitCost},
+                ${commUnits * unitCost},
+                ${qualUnits * unitCost},
+                ${totalUnits * unitCost},
+                ${sqlEscape(item.movementType || 'AVERIA_DEVOLUCION')},
+                ${sqlEscape(status)},
+                ${item.invoiceRef ? sqlEscape(item.invoiceRef) : 'NULL'},
+                ${sqlEscape(item.observations || '')},
+                ${sqlEscape(item.evidencePhotoUrl || '')},
+                ${sqlEscape(item.technicalDiagnosis || '')},
+                ${Number(item.storageTempC) || 4.0},
+                ${sqlEscape(item.createdBy || 'Excel HGI')}
+              )`;
+            });
+
+            sqlParts.push(`
+              INSERT INTO devoluciones_detalle (
+                id, fecha_recepcion, zona_id, zona_nombre, cliente_nombre,
+                producto_id, producto_nombre, cantidad_a_recibir, numero_lote, fecha_vencimiento,
+                causa_a_cobrar, causa_x_fecha, causa_vacio, causa_prox_vencer, causa_vencido, causa_abomba, causa_lechozo,
+                costo_unitario_cop, valor_comercial_cop, valor_calidad_cop, valor_total_cop,
+                tipo_movimiento, estado_cuadre, referencia_factura, observaciones,
+                foto_evidencia_url, diagnostico_tecnico, temperatura_recepcion_c, creado_por
+              ) VALUES ${valuesRows.join(',\n')}
+              ON DUPLICATE KEY UPDATE
+                fecha_recepcion = VALUES(fecha_recepcion),
+                zona_id = VALUES(zona_id),
+                zona_nombre = VALUES(zona_nombre),
+                cliente_nombre = VALUES(cliente_nombre),
+                producto_id = VALUES(producto_id),
+                producto_nombre = VALUES(producto_nombre),
+                cantidad_a_recibir = VALUES(cantidad_a_recibir),
+                numero_lote = VALUES(numero_lote),
+                fecha_vencimiento = VALUES(fecha_vencimiento),
+                causa_a_cobrar = VALUES(causa_a_cobrar),
+                causa_x_fecha = VALUES(causa_x_fecha),
+                causa_vacio = VALUES(causa_vacio),
+                causa_prox_vencer = VALUES(causa_prox_vencer),
+                causa_vencido = VALUES(causa_vencido),
+                causa_abomba = VALUES(causa_abomba),
+                causa_lechozo = VALUES(causa_lechozo),
+                costo_unitario_cop = VALUES(costo_unitario_cop),
+                valor_comercial_cop = VALUES(valor_comercial_cop),
+                valor_calidad_cop = VALUES(valor_calidad_cop),
+                valor_total_cop = VALUES(valor_total_cop),
+                tipo_movimiento = VALUES(tipo_movimiento),
+                estado_cuadre = VALUES(estado_cuadre),
+                referencia_factura = VALUES(referencia_factura),
+                observaciones = VALUES(observaciones),
+                diagnostico_tecnico = VALUES(diagnostico_tecnico);
+            `);
+          }
+
+          const bulkRes = runMysqlQuery(sqlParts.join('\n'));
+          if (!bulkRes.ok) {
+            res.statusCode = 500;
+          }
+          res.end(
+            JSON.stringify({
+              ok: bulkRes.ok,
+              totalSynced: items.length,
+              error: bulkRes.error,
+            })
+          );
+          return;
+        }
+
         // 3. PUT /api/mysql/returns/evidence -> Actualiza foto, diagnóstico y temperatura en retorna_db
         if (req.method === 'PUT' && req.url === '/api/mysql/returns/evidence') {
           const body = await readBody();

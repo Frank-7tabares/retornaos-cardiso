@@ -43,6 +43,8 @@ import { CatalogView } from './features/catalog/catalog-view';
 import { BentoGridSkeleton } from './components/ui/skeleton';
 import { Badge } from './components/ui/badge';
 import { Modal } from './components/ui/modal';
+import { ExcelSyncModal } from './components/excel-sync-modal';
+import { recalculateZonesFromRows } from './lib/excel-parser';
 
 type ActiveTab = 'DASHBOARD' | 'WORKBENCH' | 'ENGINEERING' | 'CATALOG';
 
@@ -107,6 +109,7 @@ export function App() {
   const [slideIndex, setSlideIndex] = useState<number>(0);
   const [isCarouselPlaying, setIsCarouselPlaying] = useState<boolean>(true);
   const [isGuideOpen, setIsGuideOpen] = useState(false);
+  const [isExcelModalOpen, setIsExcelModalOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
     // Al abrir el link, NUNCA iniciar sesión automáticamente.
     // Solo restaurar si el usuario ya inició sesión previamente en esta sesión de navegador.
@@ -131,7 +134,7 @@ export function App() {
   const [externalLotFilter, setExternalLotFilter] = useState<string>('ALL');
   const [mysqlConnected, setMysqlConnected] = useState<boolean>(false);
 
-  // Sync initial return items from MySQL database (retorna_db in phpMyAdmin / HeidiSQL)
+  // Sync initial return items from MySQL database (retorna_db in phpMyAdmin / HeidiSQL / Railway)
   useEffect(() => {
     fetch('/api/mysql/state')
       .then((r) => r.json())
@@ -140,6 +143,9 @@ export function App() {
           setMysqlConnected(true);
           if (data.returnItems.length > 0) {
             setReturnItems(data.returnItems);
+            if (data.returnItems.some((item: ReturnLineItem) => String(item.id).startsWith('xl-'))) {
+              setZones((prev) => recalculateZonesFromRows(prev, data.returnItems));
+            }
           }
         }
       })
@@ -190,6 +196,9 @@ export function App() {
         if (data?.ok && Array.isArray(data.returnItems)) {
           setMysqlConnected(true);
           setReturnItems(data.returnItems);
+          if (data.returnItems.some((item: ReturnLineItem) => String(item.id).startsWith('xl-'))) {
+            setZones((prev) => recalculateZonesFromRows(prev, data.returnItems));
+          }
         }
       })
       .finally(() => {
@@ -197,10 +206,63 @@ export function App() {
           setIsRefreshing(false);
           toast.success('Sincronizado con Base de Datos MySQL (retorna_db)', {
             description:
-              'Registros leídos en tiempo real desde tu servidor local phpMyAdmin / HeidiSQL.',
+              'Registros leídos en tiempo real desde la base de datos.',
           });
         }, 350);
       });
+  };
+
+  const handleSyncExcelItems = async (
+    items: ReturnLineItem[],
+    options: { replaceAll: boolean; fileName: string }
+  ): Promise<{ ok: boolean; totalSynced: number; error?: string }> => {
+    setReturnItems((prev) => {
+      let next: ReturnLineItem[];
+      if (options.replaceAll) {
+        next = items;
+      } else {
+        const map = new Map<string, ReturnLineItem>();
+        for (const oldItem of prev) {
+          if (!String(oldItem.id).startsWith('ret-')) {
+            map.set(oldItem.id, oldItem);
+          }
+        }
+        for (const newItem of items) {
+          map.set(newItem.id, newItem);
+        }
+        next = Array.from(map.values());
+      }
+      setZones((prevZones) => recalculateZonesFromRows(prevZones, next));
+      return next;
+    });
+
+    try {
+      const response = await fetch('/api/mysql/returns/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items,
+          clearDemo: true,
+          replaceAll: options.replaceAll,
+        }),
+      });
+      const res = await response.json();
+      if (res?.ok) {
+        setMysqlConnected(true);
+        return { ok: true, totalSynced: res.totalSynced || res.count || items.length };
+      }
+      return {
+        ok: false,
+        totalSynced: items.length,
+        error: res?.error || 'Guardado en sesión (verificar MySQL)',
+      };
+    } catch (err: any) {
+      return {
+        ok: false,
+        totalSynced: items.length,
+        error: String(err?.message || err),
+      };
+    }
   };
 
   const handleSelectZoneFromDashboard = (zoneId: string) => {
@@ -674,6 +736,16 @@ export function App() {
 
             <button
               type="button"
+              onClick={() => setIsExcelModalOpen(true)}
+              title="Subir o actualizar el archivo Excel acumulado del día (.xlsx)"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-400/50 bg-emerald-600/90 hover:bg-emerald-500 px-3 py-1.5 text-xs font-bold text-white shadow-sm shadow-emerald-600/20 transition-all"
+            >
+              <FileSpreadsheet className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Subir Excel (.xlsx)</span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => setIsGuideOpen(true)}
               className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-400/40 bg-indigo-500/20 hover:bg-indigo-500/30 px-3 py-1.5 text-xs font-semibold text-indigo-700 dark:text-indigo-200 transition-all"
             >
@@ -853,11 +925,13 @@ export function App() {
                 ? () => setActiveTab('ENGINEERING')
                 : undefined
             }
+            onOpenExcelModal={() => setIsExcelModalOpen(true)}
           />
         ) : activeTab === 'ENGINEERING' && (currentUser.role === 'CALIDAD' || currentUser.role === 'ADMIN') ? (
           <ProductionEngineeringView
             returnRows={computedRows}
             onUpdateRowEvidence={handleUpdateRowEvidence}
+            onOpenExcelModal={() => setIsExcelModalOpen(true)}
           />
         ) : (currentUser.role === 'ADMIN' || currentUser.role === 'CALIDAD') ? (
           <CatalogView
@@ -877,9 +951,17 @@ export function App() {
             onUpdateRowEvidence={handleUpdateRowEvidence}
             externalLotFilter={externalLotFilter}
             onClearExternalLotFilter={() => setExternalLotFilter('ALL')}
+            onOpenExcelModal={() => setIsExcelModalOpen(true)}
           />
         )}
       </main>
+
+      {/* Modal de Sincronización Diaria de Excel (.xlsx) */}
+      <ExcelSyncModal
+        open={isExcelModalOpen}
+        onClose={() => setIsExcelModalOpen(false)}
+        onSyncItems={handleSyncExcelItems}
+      />
 
       {/* Modal de Guía Fácil Paso a Paso */}
       <Modal

@@ -142,6 +142,12 @@ async function initDatabase() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `);
 
+    // Asegurar que columnas existentes soporten IDs de Excel y fotos Base64 largas
+    try {
+      await conn.query('ALTER TABLE devoluciones_detalle MODIFY COLUMN id VARCHAR(80) NOT NULL;');
+      await conn.query('ALTER TABLE devoluciones_detalle MODIFY COLUMN foto_evidencia_url LONGTEXT DEFAULT NULL;');
+    } catch {}
+
     console.log('✅ Las 4 tablas están verificadas y listas en MySQL.');
     conn.release();
   } catch (err) {
@@ -321,6 +327,134 @@ app.post('/api/mysql/returns', async (req, res) => {
     res.json({ ok: true, id: item.id });
   } catch (err) {
     console.error('❌ Error en POST /api/mysql/returns:', err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// 2B. POST /api/mysql/returns/bulk -> Sincronización masiva desde Excel HGI (.xlsx)
+app.post('/api/mysql/returns/bulk', async (req, res) => {
+  if (!pool) {
+    return res.status(500).json({ ok: false, error: 'Sin conexión a base de datos' });
+  }
+  try {
+    const { items, clearDemo = true, replaceAll = false } = req.body || {};
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ ok: false, error: 'No se recibieron filas válidas del Excel' });
+    }
+
+    const conn = await pool.getConnection();
+    try {
+      if (replaceAll) {
+        await conn.query('DELETE FROM devoluciones_detalle');
+      } else if (clearDemo) {
+        await conn.query("DELETE FROM devoluciones_detalle WHERE id LIKE 'ret-%'");
+      }
+
+      const chunkSize = 100;
+      for (let i = 0; i < items.length; i += chunkSize) {
+        const chunk = items.slice(i, i + chunkSize);
+        const values = [];
+        const placeholders = [];
+
+        for (const item of chunk) {
+          const c = item.causes || {};
+          const unitCost = Number(item.unitCost) || 0;
+          const commUnits =
+            (Number(c.aCobrar) || 0) +
+            (Number(c.proxVencer) || 0) +
+            (Number(c.vencido) || 0);
+          const qualUnits =
+            (Number(c.vacio) || 0) +
+            (Number(c.xFecha) || 0) +
+            (Number(c.abomba) || 0) +
+            (Number(c.lechozo) || 0);
+          const totalUnits = commUnits + qualUnits;
+          const status =
+            Number(item.qtyToReceive) === totalUnits ? 'CUADRADO' : 'REVISAR';
+
+          placeholders.push(
+            '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+          );
+          values.push(
+            item.id,
+            item.date,
+            item.zoneId,
+            item.zoneName,
+            item.clientName,
+            item.productId,
+            item.productName,
+            Number(item.qtyToReceive) || 1,
+            item.lotNumber || 'S/L',
+            item.productExpiryDate || item.date,
+            Number(c.aCobrar) || 0,
+            Number(c.xFecha) || 0,
+            Number(c.vacio) || 0,
+            Number(c.proxVencer) || 0,
+            Number(c.vencido) || 0,
+            Number(c.abomba) || 0,
+            Number(c.lechozo) || 0,
+            unitCost,
+            commUnits * unitCost,
+            qualUnits * unitCost,
+            totalUnits * unitCost,
+            item.movementType || 'AVERIA_DEVOLUCION',
+            status,
+            item.invoiceRef || null,
+            item.observations || '',
+            item.evidencePhotoUrl || '',
+            item.technicalDiagnosis || '',
+            Number(item.storageTempC) || 4.0,
+            item.createdBy || 'Excel HGI'
+          );
+        }
+
+        const sql = `
+          INSERT INTO devoluciones_detalle (
+            id, fecha_recepcion, zona_id, zona_nombre, cliente_nombre,
+            producto_id, producto_nombre, cantidad_a_recibir, numero_lote, fecha_vencimiento,
+            causa_a_cobrar, causa_x_fecha, causa_vacio, causa_prox_vencer, causa_vencido, causa_abomba, causa_lechozo,
+            costo_unitario_cop, valor_comercial_cop, valor_calidad_cop, valor_total_cop,
+            tipo_movimiento, estado_cuadre, referencia_factura, observaciones,
+            foto_evidencia_url, diagnostico_tecnico, temperatura_recepcion_c, creado_por
+          ) VALUES ${placeholders.join(', ')}
+          ON DUPLICATE KEY UPDATE
+            fecha_recepcion = VALUES(fecha_recepcion),
+            zona_id = VALUES(zona_id),
+            zona_nombre = VALUES(zona_nombre),
+            cliente_nombre = VALUES(cliente_nombre),
+            producto_id = VALUES(producto_id),
+            producto_nombre = VALUES(producto_nombre),
+            cantidad_a_recibir = VALUES(cantidad_a_recibir),
+            numero_lote = VALUES(numero_lote),
+            fecha_vencimiento = VALUES(fecha_vencimiento),
+            causa_a_cobrar = VALUES(causa_a_cobrar),
+            causa_x_fecha = VALUES(causa_x_fecha),
+            causa_vacio = VALUES(causa_vacio),
+            causa_prox_vencer = VALUES(causa_prox_vencer),
+            causa_vencido = VALUES(causa_vencido),
+            causa_abomba = VALUES(causa_abomba),
+            causa_lechozo = VALUES(causa_lechozo),
+            costo_unitario_cop = VALUES(costo_unitario_cop),
+            valor_comercial_cop = VALUES(valor_comercial_cop),
+            valor_calidad_cop = VALUES(valor_calidad_cop),
+            valor_total_cop = VALUES(valor_total_cop),
+            tipo_movimiento = VALUES(tipo_movimiento),
+            estado_cuadre = VALUES(estado_cuadre),
+            referencia_factura = VALUES(referencia_factura),
+            observaciones = VALUES(observaciones),
+            diagnostico_tecnico = VALUES(diagnostico_tecnico)
+        `;
+        await conn.query(sql, values);
+      }
+
+      conn.release();
+      res.json({ ok: true, totalSynced: items.length, count: items.length });
+    } catch (innerErr) {
+      conn.release();
+      throw innerErr;
+    }
+  } catch (err) {
+    console.error('❌ Error en POST /api/mysql/returns/bulk:', err.message);
     res.status(500).json({ ok: false, error: err.message });
   }
 });

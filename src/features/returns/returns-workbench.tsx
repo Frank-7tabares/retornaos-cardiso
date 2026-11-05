@@ -20,6 +20,7 @@ import {
   ArrowRight,
   Table2,
   LayoutList,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { BentoCard } from '../../components/ui/bento-card';
@@ -61,6 +62,7 @@ interface ReturnsWorkbenchProps {
   externalLotFilter?: string;
   onClearExternalLotFilter?: () => void;
   onGoToEngineering?: () => void;
+  onOpenExcelModal?: () => void;
 }
 
 const SAMPLE_EVIDENCE_PHOTOS = [
@@ -125,6 +127,7 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
   externalLotFilter,
   onClearExternalLotFilter,
   onGoToEngineering,
+  onOpenExcelModal,
 }) => {
   const [isLoadingZone, setIsLoadingZone] = useState(false);
   const [showHiddenMoneyCols, setShowHiddenMoneyCols] = useState(false);
@@ -607,7 +610,19 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
             ))}
           </select>
 
-          <div className="grid grid-cols-2 sm:flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            {/* Upload / Sync Daily Excel (.xlsx) CTA */}
+            {onOpenExcelModal && (
+              <button
+                type="button"
+                onClick={onOpenExcelModal}
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-indigo-400/50 bg-indigo-600/90 hover:bg-indigo-500 px-3.5 py-2.5 text-xs font-bold text-white shadow-lg shadow-indigo-600/25 transition-all duration-200"
+              >
+                <FileSpreadsheet className="h-4 w-4 shrink-0" />
+                <span className="truncate">Subir / Actualizar Excel (.xlsx)</span>
+              </button>
+            )}
+
             {/* Toggle Hidden Columns Q..W */}
             <button
               type="button"
@@ -643,7 +658,7 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
               className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 px-3.5 py-2.5 text-xs font-semibold text-white shadow-lg shadow-emerald-600/25 transition-all duration-200"
             >
               <Camera className="h-4 w-4 shrink-0" />
-              <span className="truncate">+ Registrar Devolución</span>
+              <span className="truncate">+ Registrar Individual</span>
             </button>
           </div>
         </div>
