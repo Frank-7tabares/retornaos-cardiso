@@ -134,7 +134,9 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
   const [forceTableOnMobile, setForceTableOnMobile] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [lotFilter, setLotFilter] = useState<string>('ALL');
-  const [causeFilter, setCauseFilter] = useState<'ALL' | ReturnCauseKey>('ALL');
+  const [causeFilter, setCauseFilter] = useState<
+    'ALL' | 'PROX_VENCER_GROUP' | 'CALIDAD_GROUP' | ReturnCauseKey
+  >('ALL');
   const [searchAllZonesForLot, setSearchAllZonesForLot] = useState(false);
   const [statusFilter, setStatusFilter] = useState<
     'ALL' | 'CUADRADO' | 'REVISAR' | 'JUSTIFICADO_NO_AVERIA'
@@ -279,12 +281,33 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
     returnRows,
   ]);
 
+  const baseZoneRows = useMemo(() => {
+    if (!activeZone) return [];
+    return returnRows.filter((r) => {
+      if (!searchAllZonesForLot && r.zoneId !== activeZone.id) return false;
+      return true;
+    });
+  }, [returnRows, activeZone, searchAllZonesForLot]);
+
   const zoneRows = useMemo(() => {
     if (!activeZone) return [];
     return returnRows.filter((r) => {
       if (!searchAllZonesForLot && r.zoneId !== activeZone.id) return false;
       if (lotFilter !== 'ALL' && r.lotNumber !== lotFilter) return false;
-      if (causeFilter !== 'ALL' && r.causes[causeFilter] <= 0) return false;
+      if (causeFilter === 'PROX_VENCER_GROUP') {
+        if (r.causes.proxVencer + r.causes.vencido <= 0) return false;
+      } else if (causeFilter === 'CALIDAD_GROUP') {
+        if (
+          r.causes.vacio +
+            r.causes.lechozo +
+            r.causes.xFecha +
+            r.causes.abomba <=
+          0
+        )
+          return false;
+      } else if (causeFilter !== 'ALL' && r.causes[causeFilter] <= 0) {
+        return false;
+      }
       if (statusFilter !== 'ALL' && r.reconciliationStatus !== statusFilter)
         return false;
       if (searchQuery.trim()) {
@@ -500,6 +523,48 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
     }
   };
 
+  const zoneSummaryTotals = useMemo(() => {
+    return baseZoneRows.reduce(
+      (acc, r) => {
+        acc.qtyToReceive += r.qtyToReceive;
+        acc.totalClassified += r.totalClassifiedUnits;
+        acc.totalCOP += r.totalValueCOP;
+        acc.commCOP += r.commercialValueCOP;
+        acc.qualCOP += r.qualityValueCOP;
+        (Object.keys(acc.causes) as ReturnCauseKey[]).forEach((k) => {
+          acc.causes[k] += r.causes[k];
+          acc.causesCOP[k] += r.copByCause[k];
+        });
+        return acc;
+      },
+      {
+        qtyToReceive: 0,
+        totalClassified: 0,
+        totalCOP: 0,
+        commCOP: 0,
+        qualCOP: 0,
+        causes: {
+          aCobrar: 0,
+          xFecha: 0,
+          vacio: 0,
+          proxVencer: 0,
+          vencido: 0,
+          abomba: 0,
+          lechozo: 0,
+        } as Record<ReturnCauseKey, number>,
+        causesCOP: {
+          aCobrar: 0,
+          xFecha: 0,
+          vacio: 0,
+          proxVencer: 0,
+          vencido: 0,
+          abomba: 0,
+          lechozo: 0,
+        } as Record<ReturnCauseKey, number>,
+      }
+    );
+  }, [baseZoneRows]);
+
   const tableTotals = useMemo(() => {
     return zoneRows.reduce(
       (acc, r) => {
@@ -693,74 +758,177 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
         </div>
       </div>
 
-      {/* Resumen Ejecutivo de Mis Devoluciones (4 Tarjetas Rápidas para el Vendedor) */}
+      {/* Resumen Ejecutivo de Mis Devoluciones (4 Tarjetas Rápidas Interactivas para el Vendedor) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <BentoCard className="p-3.5 sm:p-4">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400">
-            Total Mis Devoluciones
-          </span>
-          <div className="mt-1 flex items-baseline gap-2">
-            <span className="font-mono text-xl sm:text-2xl font-extrabold text-neutral-900 dark:text-white">
-              {formatCOP(tableTotals.totalCOP)}
-            </span>
-          </div>
-          <p className="mt-1 text-[11px] text-indigo-400 font-medium">
-            {formatNumber(tableTotals.qtyToReceive)} unds en {zoneRows.length} registros
-          </p>
-        </BentoCard>
-
-        <BentoCard className="p-3.5 sm:p-4">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-rose-400">
-            A Cobrar (Factura / Cruce)
-          </span>
-          <div className="mt-1 flex items-baseline gap-2">
-            <span className="font-mono text-xl sm:text-2xl font-extrabold text-rose-400">
-              {formatCOP(tableTotals.causesCOP.aCobrar)}
-            </span>
-          </div>
-          <p className="mt-1 text-[11px] text-neutral-500 dark:text-slate-300">
-            {formatNumber(tableTotals.causes.aCobrar)} unidades a cobrar
-          </p>
-        </BentoCard>
-
-        <BentoCard className="p-3.5 sm:p-4">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-amber-400">
-            Próx. a Vencer / Vencido
-          </span>
-          <div className="mt-1 flex items-baseline gap-2">
-            <span className="font-mono text-xl sm:text-2xl font-extrabold text-amber-400">
-              {formatCOP(
-                tableTotals.causesCOP.proxVencer + tableTotals.causesCOP.vencido
+        <button
+          type="button"
+          onClick={() => setCauseFilter('ALL')}
+          className="text-left focus:outline-none group"
+        >
+          <BentoCard
+            className={`p-3.5 sm:p-4 h-full transition-all duration-200 cursor-pointer ${
+              causeFilter === 'ALL'
+                ? 'ring-2 ring-indigo-400/80 bg-indigo-950/40'
+                : 'hover:border-white/30'
+            }`}
+          >
+            <div className="flex items-center justify-between gap-1">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400">
+                Total Mis Devoluciones
+              </span>
+              {causeFilter === 'ALL' && (
+                <span className="rounded-md bg-indigo-500/20 px-1.5 py-0.5 text-[9px] font-bold text-indigo-300">
+                  Ver Todos
+                </span>
               )}
-            </span>
-          </div>
-          <p className="mt-1 text-[11px] text-neutral-500 dark:text-slate-300">
-            {formatNumber(
-              tableTotals.causes.proxVencer + tableTotals.causes.vencido
-            )}{' '}
-            unds rotación comercial
-          </p>
-        </BentoCard>
+            </div>
+            <div className="mt-1 flex items-baseline gap-2">
+              <span className="font-mono text-xl sm:text-2xl font-extrabold text-neutral-900 dark:text-white">
+                {formatCOP(zoneSummaryTotals.totalCOP)}
+              </span>
+            </div>
+            <p className="mt-1 text-[11px] text-indigo-400 font-medium">
+              {formatNumber(zoneSummaryTotals.qtyToReceive)} unds en{' '}
+              {baseZoneRows.length} registros
+            </p>
+          </BentoCard>
+        </button>
 
-        <BentoCard className="p-3.5 sm:p-4">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-sky-400">
-            Calidad Planta (Vacío / Lechoso)
-          </span>
-          <div className="mt-1 flex items-baseline gap-2">
-            <span className="font-mono text-xl sm:text-2xl font-extrabold text-sky-400">
-              {formatCOP(tableTotals.qualCOP)}
-            </span>
-          </div>
-          <p className="mt-1 text-[11px] text-neutral-500 dark:text-slate-300">
-            {formatNumber(
-              tableTotals.causes.vacio +
-                tableTotals.causes.lechozo +
-                tableTotals.causes.xFecha +
-                tableTotals.causes.abomba
-            )}{' '}
-            unds calidad planta
-          </p>
-        </BentoCard>
+        <button
+          type="button"
+          onClick={() =>
+            setCauseFilter((prev) => (prev === 'aCobrar' ? 'ALL' : 'aCobrar'))
+          }
+          className="text-left focus:outline-none group"
+        >
+          <BentoCard
+            className={`p-3.5 sm:p-4 h-full transition-all duration-200 cursor-pointer ${
+              causeFilter === 'aCobrar'
+                ? 'ring-2 ring-rose-400 bg-rose-950/45 shadow-lg shadow-rose-500/15'
+                : 'hover:border-rose-400/40'
+            }`}
+          >
+            <div className="flex items-center justify-between gap-1">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-rose-400">
+                A Cobrar (Factura / Cruce)
+              </span>
+              <span
+                className={`rounded-md px-1.5 py-0.5 text-[9px] font-bold transition-colors ${
+                  causeFilter === 'aCobrar'
+                    ? 'bg-rose-500 text-white'
+                    : 'bg-rose-500/15 text-rose-300 group-hover:bg-rose-500/25'
+                }`}
+              >
+                {causeFilter === 'aCobrar' ? 'Activo ✕' : 'Filtrar'}
+              </span>
+            </div>
+            <div className="mt-1 flex items-baseline gap-2">
+              <span className="font-mono text-xl sm:text-2xl font-extrabold text-rose-400">
+                {formatCOP(zoneSummaryTotals.causesCOP.aCobrar)}
+              </span>
+            </div>
+            <p className="mt-1 text-[11px] text-neutral-500 dark:text-slate-300">
+              {formatNumber(zoneSummaryTotals.causes.aCobrar)} unidades a cobrar
+            </p>
+          </BentoCard>
+        </button>
+
+        <button
+          type="button"
+          onClick={() =>
+            setCauseFilter((prev) =>
+              prev === 'PROX_VENCER_GROUP' ? 'ALL' : 'PROX_VENCER_GROUP'
+            )
+          }
+          className="text-left focus:outline-none group"
+        >
+          <BentoCard
+            className={`p-3.5 sm:p-4 h-full transition-all duration-200 cursor-pointer ${
+              causeFilter === 'PROX_VENCER_GROUP' ||
+              causeFilter === 'proxVencer' ||
+              causeFilter === 'vencido'
+                ? 'ring-2 ring-amber-400 bg-amber-950/45 shadow-lg shadow-amber-500/15'
+                : 'hover:border-amber-400/40'
+            }`}
+          >
+            <div className="flex items-center justify-between gap-1">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-amber-400">
+                Próx. a Vencer / Vencido
+              </span>
+              <span
+                className={`rounded-md px-1.5 py-0.5 text-[9px] font-bold transition-colors ${
+                  causeFilter === 'PROX_VENCER_GROUP'
+                    ? 'bg-amber-500 text-slate-950'
+                    : 'bg-amber-500/15 text-amber-300 group-hover:bg-amber-500/25'
+                }`}
+              >
+                {causeFilter === 'PROX_VENCER_GROUP' ? 'Activo ✕' : 'Filtrar'}
+              </span>
+            </div>
+            <div className="mt-1 flex items-baseline gap-2">
+              <span className="font-mono text-xl sm:text-2xl font-extrabold text-amber-400">
+                {formatCOP(
+                  zoneSummaryTotals.causesCOP.proxVencer +
+                    zoneSummaryTotals.causesCOP.vencido
+                )}
+              </span>
+            </div>
+            <p className="mt-1 text-[11px] text-neutral-500 dark:text-slate-300">
+              {formatNumber(
+                zoneSummaryTotals.causes.proxVencer +
+                  zoneSummaryTotals.causes.vencido
+              )}{' '}
+              unds rotación comercial
+            </p>
+          </BentoCard>
+        </button>
+
+        <button
+          type="button"
+          onClick={() =>
+            setCauseFilter((prev) =>
+              prev === 'CALIDAD_GROUP' ? 'ALL' : 'CALIDAD_GROUP'
+            )
+          }
+          className="text-left focus:outline-none group"
+        >
+          <BentoCard
+            className={`p-3.5 sm:p-4 h-full transition-all duration-200 cursor-pointer ${
+              causeFilter === 'CALIDAD_GROUP'
+                ? 'ring-2 ring-sky-400 bg-sky-950/45 shadow-lg shadow-sky-500/15'
+                : 'hover:border-sky-400/40'
+            }`}
+          >
+            <div className="flex items-center justify-between gap-1">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-sky-400">
+                Calidad Planta (Vacío / Lechoso)
+              </span>
+              <span
+                className={`rounded-md px-1.5 py-0.5 text-[9px] font-bold transition-colors ${
+                  causeFilter === 'CALIDAD_GROUP'
+                    ? 'bg-sky-500 text-slate-950'
+                    : 'bg-sky-500/15 text-sky-300 group-hover:bg-sky-500/25'
+                }`}
+              >
+                {causeFilter === 'CALIDAD_GROUP' ? 'Activo ✕' : 'Filtrar'}
+              </span>
+            </div>
+            <div className="mt-1 flex items-baseline gap-2">
+              <span className="font-mono text-xl sm:text-2xl font-extrabold text-sky-400">
+                {formatCOP(zoneSummaryTotals.qualCOP)}
+              </span>
+            </div>
+            <p className="mt-1 text-[11px] text-neutral-500 dark:text-slate-300">
+              {formatNumber(
+                zoneSummaryTotals.causes.vacio +
+                  zoneSummaryTotals.causes.lechozo +
+                  zoneSummaryTotals.causes.xFecha +
+                  zoneSummaryTotals.causes.abomba
+              )}{' '}
+              unds calidad planta
+            </p>
+          </BentoCard>
+        </button>
       </div>
 
       {/* Interactive Lot & Cause Explorer Bar (Mobile Responsive) */}
@@ -810,11 +978,23 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
             <select
               value={causeFilter}
               onChange={(e) =>
-                setCauseFilter(e.target.value as 'ALL' | ReturnCauseKey)
+                setCauseFilter(
+                  e.target.value as
+                    | 'ALL'
+                    | 'PROX_VENCER_GROUP'
+                    | 'CALIDAD_GROUP'
+                    | ReturnCauseKey
+                )
               }
               className="w-full sm:w-auto rounded-xl border border-neutral-300 dark:border-white/15 bg-white/90 dark:bg-slate-950/80 px-3 py-2 text-xs font-medium text-neutral-900 dark:text-white focus:border-indigo-500 focus:outline-none"
             >
               <option value="ALL">Todas las 7 Causas (Cols G–M)</option>
+              <option value="PROX_VENCER_GROUP">
+                Filtro: Próx. a Vencer / Vencido (Comercial)
+              </option>
+              <option value="CALIDAD_GROUP">
+                Filtro: Calidad Planta (Vacío / Lechoso / Fecha)
+              </option>
               {CAUSE_METADATA.map((c) => (
                 <option key={c.key} value={c.key}>
                   Causa: {c.fullLabel} ({c.responsibility})
