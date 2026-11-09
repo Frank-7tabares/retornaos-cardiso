@@ -336,8 +336,8 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
             <td style="text-align:center;font-weight:800;color:#475569;">${idx + 1}</td>
             <td style="font-weight:800;color:#0f172a;">${z.consolidatedName}</td>
             <td style="text-align:right;color:#047857;font-weight:800;">${formatCompactCOP(z.monthlySalesCOP)}</td>
-            <td style="text-align:right;color:#b45309;font-weight:700;">${formatCompactCOP(z.commercialCOP)} (${z.commercialUnits}u)</td>
-            <td style="text-align:right;color:#0369a1;font-weight:700;">${formatCompactCOP(z.qualityCOP)} (${z.qualityUnits}u)</td>
+            <td style="text-align:right;color:#b45309;font-weight:700;">${formatCompactCOP(z.commercialCOP)}</td>
+            <td style="text-align:right;color:#0369a1;font-weight:700;">${formatCompactCOP(z.qualityCOP)}</td>
             <td style="text-align:right;font-weight:900;color:#0f172a;">${formatCompactCOP(z.totalCOP)}</td>
             <td style="text-align:right;font-weight:800;color:${z.pctTotalOverSales > 6 ? '#be123c' : '#047857'};">${formatPercent(z.pctTotalOverSales)}</td>
           </tr>
@@ -504,10 +504,12 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
           }
           .tables-grid {
             display: grid;
-            grid-template-columns: 1.03fr 0.97fr;
+            grid-template-columns: minmax(0, 53%) minmax(0, 46%);
+            justify-content: space-between;
             gap: 8px;
             height: 100%;
             min-height: 0;
+            min-width: 0;
             width: 100%;
           }
           .table-card {
@@ -518,6 +520,8 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
             grid-template-rows: auto 1fr;
             height: 100%;
             width: 100%;
+            min-width: 0;
+            max-width: 100%;
             background: #ffffff;
           }
           .table-header {
@@ -691,25 +695,25 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
 
             <div class="table-card">
               <div class="table-header">
-                <span>ESCALAFÓN DE ZONAS Y VENDEDORES OFICIALES</span>
-                <span>14 Vendedores + Z14/PDV</span>
+                <span>ESCALAFÓN DE ZONAS Y VENDEDORES</span>
+                <span>Z01–Z16 · Z14 · PDV</span>
               </div>
               <table>
                 <colgroup>
                   <col style="width:5%;" />
-                  <col style="width:31%;" />
-                  <col style="width:14%;" />
-                  <col style="width:15%;" />
+                  <col style="width:33%;" />
                   <col style="width:14%;" />
                   <col style="width:12%;" />
-                  <col style="width:9%;" />
+                  <col style="width:12%;" />
+                  <col style="width:13%;" />
+                  <col style="width:11%;" />
                 </colgroup>
                 <thead>
                   <tr>
                     <th style="text-align:center;">#</th>
                     <th>Zona / Vendedor</th>
                     <th style="text-align:right;">Ventas Mes</th>
-                    <th style="text-align:right;">Comercial</th>
+                    <th style="text-align:right;">Comerc.</th>
                     <th style="text-align:right;">Calidad</th>
                     <th style="text-align:right;">Total Dev</th>
                     <th style="text-align:right;">% Inc</th>
