@@ -294,56 +294,61 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
     };
   }, [zoneMetricsList, filteredRows]);
 
-  // Generador de Impresión / PDF ocupando la hoja completa
+  // Generador de Impresión / PDF ocupando el 100% de la hoja completa
   const handlePrintSinglePageReport = () => {
     const logoUrl = `${window.location.origin}/cardiso_logo.png`;
     const activePeriodLabel =
       dateFilter === 'ALL' ? `${minDate} al ${maxDate}` : `Fecha: ${dateFilter}`;
 
+    const ROW_COUNT = Math.min(
+      18,
+      Math.max(productAnalytics.escalafonList.length, sortedZones.length)
+    );
+
     const productsRowsHtml = productAnalytics.escalafonList
-      .slice(0, 22)
+      .slice(0, ROW_COUNT)
       .map((p, idx) => {
         const action =
           p.commercialUnits > p.qualityUnits
-            ? 'Bajar stock ruta'
+            ? 'Bajar stock en ruta'
             : p.lechozoUnits >= p.vacioUnits && p.lechozoUnits > 0
-            ? 'Control Lechosidad'
+            ? 'Controlar Lechosidad'
             : p.vacioUnits > 0
-            ? 'Revisar Vacío'
+            ? 'Auditar Sellado Vacío'
             : 'Rotación Óptima';
         return `
           <tr>
-            <td style="text-align:center;font-weight:700;color:#475569;">${idx + 1}</td>
-            <td style="font-weight:700;color:#0f172a;">${p.productName}</td>
-            <td style="text-align:right;color:#b45309;font-weight:600;">${p.commercialUnits}u (${formatCompactCOP(p.commercialCOP)})</td>
-            <td style="text-align:right;color:#0369a1;font-weight:600;">${p.qualityUnits}u (${formatCompactCOP(p.qualityCOP)})</td>
-            <td style="text-align:center;color:#6d28d9;font-weight:700;">${p.lechozoUnits || '-'}</td>
-            <td style="text-align:center;color:#0284c7;font-weight:700;">${p.vacioUnits || '-'}</td>
-            <td style="text-align:right;font-weight:800;color:#0f172a;">${p.totalUnits}u · ${formatCompactCOP(p.totalCOP)}</td>
-            <td style="font-size:9px;color:#1e293b;font-weight:600;">${action}</td>
+            <td style="text-align:center;font-weight:800;color:#475569;">${idx + 1}</td>
+            <td style="font-weight:800;color:#0f172a;">${p.productName}</td>
+            <td style="text-align:right;color:#b45309;font-weight:700;">${p.commercialUnits}u (${formatCompactCOP(p.commercialCOP)})</td>
+            <td style="text-align:right;color:#0369a1;font-weight:700;">${p.qualityUnits}u (${formatCompactCOP(p.qualityCOP)})</td>
+            <td style="text-align:center;color:#6d28d9;font-weight:800;">${p.lechozoUnits || '-'}</td>
+            <td style="text-align:center;color:#0284c7;font-weight:800;">${p.vacioUnits || '-'}</td>
+            <td style="text-align:right;font-weight:900;color:#0f172a;">${p.totalUnits}u · ${formatCompactCOP(p.totalCOP)}</td>
+            <td style="font-size:9.5px;color:#0f172a;font-weight:700;">${action}</td>
           </tr>
         `;
       })
       .join('');
 
     const zonesRowsHtml = sortedZones
-      .slice(0, 22)
+      .slice(0, ROW_COUNT)
       .map(
         (z, idx) => `
           <tr>
-            <td style="text-align:center;font-weight:700;color:#475569;">${idx + 1}</td>
-            <td style="font-weight:700;color:#0f172a;">${z.consolidatedName}</td>
-            <td style="text-align:right;color:#047857;font-weight:700;">${formatCompactCOP(z.monthlySalesCOP)}</td>
-            <td style="text-align:right;color:#b45309;">${formatCompactCOP(z.commercialCOP)} (${z.commercialUnits}u)</td>
-            <td style="text-align:right;color:#0369a1;">${formatCompactCOP(z.qualityCOP)} (${z.qualityUnits}u)</td>
-            <td style="text-align:right;font-weight:800;color:#0f172a;">${formatCompactCOP(z.totalCOP)}</td>
-            <td style="text-align:right;font-weight:700;color:${z.pctTotalOverSales > 6 ? '#be123c' : '#047857'};">${formatPercent(z.pctTotalOverSales)}</td>
+            <td style="text-align:center;font-weight:800;color:#475569;">${idx + 1}</td>
+            <td style="font-weight:800;color:#0f172a;">${z.consolidatedName}</td>
+            <td style="text-align:right;color:#047857;font-weight:800;">${formatCompactCOP(z.monthlySalesCOP)}</td>
+            <td style="text-align:right;color:#b45309;font-weight:700;">${formatCompactCOP(z.commercialCOP)} (${z.commercialUnits}u)</td>
+            <td style="text-align:right;color:#0369a1;font-weight:700;">${formatCompactCOP(z.qualityCOP)} (${z.qualityUnits}u)</td>
+            <td style="text-align:right;font-weight:900;color:#0f172a;">${formatCompactCOP(z.totalCOP)}</td>
+            <td style="text-align:right;font-weight:800;color:${z.pctTotalOverSales > 6 ? '#be123c' : '#047857'};">${formatPercent(z.pctTotalOverSales)}</td>
           </tr>
         `
       )
       .join('');
 
-    const printWindow = window.open('', '_blank', 'width=1280,height=900');
+    const printWindow = window.open('', '_blank', 'width=1360,height=920');
     if (!printWindow) {
       window.print();
       return;
@@ -358,7 +363,7 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
         <style>
           @page {
             size: A4 landscape;
-            margin: 5mm;
+            margin: 4mm;
           }
           * {
             box-sizing: border-box;
@@ -373,28 +378,25 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
             height: 100%;
             background: #ffffff;
             color: #0f172a;
-            font-size: 10px;
-            line-height: 1.3;
+            overflow: hidden;
           }
           .sheet {
-            width: 100%;
-            min-height: 98vh;
-            height: 98vh;
-            border: 1.5px solid #cbd5e1;
+            width: 100vw;
+            height: 100vh;
+            border: 2px solid #94a3b8;
             border-radius: 10px;
-            padding: 12px 14px;
+            padding: 10px 14px;
             background: #ffffff;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
+            display: grid;
+            grid-template-rows: auto auto auto 1fr auto;
+            gap: 8px;
           }
           .header {
             display: flex;
             align-items: center;
             justify-content: space-between;
             border-bottom: 2.5px solid #059669;
-            padding-bottom: 8px;
-            margin-bottom: 8px;
+            padding-bottom: 6px;
           }
           .header-left {
             display: flex;
@@ -402,34 +404,34 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
             gap: 14px;
           }
           .logo {
-            height: 46px;
+            height: 48px;
             width: auto;
             object-fit: contain;
           }
           .company-tag {
-            font-size: 9px;
+            font-size: 9.5px;
             font-weight: 800;
             color: #059669;
             letter-spacing: 0.08em;
             text-transform: uppercase;
           }
           .report-title {
-            font-size: 15px;
+            font-size: 16px;
             font-weight: 900;
             color: #0f172a;
             margin-top: 1px;
           }
           .report-sub {
-            font-size: 9.5px;
-            color: #475569;
+            font-size: 10px;
+            color: #334155;
             margin-top: 1px;
           }
           .cutoff-box {
             text-align: right;
             background: #ecfdf5;
-            border: 1.5px solid #6ee7b7;
+            border: 1.5px solid #34d399;
             border-radius: 8px;
-            padding: 5px 12px;
+            padding: 5px 14px;
           }
           .cutoff-label {
             font-size: 8.5px;
@@ -438,7 +440,7 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
             color: #047857;
           }
           .cutoff-date {
-            font-size: 14px;
+            font-size: 15px;
             font-weight: 900;
             color: #065f46;
           }
@@ -446,194 +448,199 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
             display: grid;
             grid-template-columns: repeat(4, 1fr);
             gap: 10px;
-            margin-bottom: 8px;
           }
           .kpi-card {
-            border: 1px solid #cbd5e1;
+            border: 1.5px solid #cbd5e1;
             border-radius: 8px;
-            padding: 6px 10px;
+            padding: 6px 12px;
             background: #f8fafc;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
           }
           .kpi-label {
-            font-size: 8.5px;
+            font-size: 9px;
             font-weight: 800;
             text-transform: uppercase;
             color: #475569;
           }
           .kpi-val {
-            font-size: 14px;
+            font-size: 15px;
             font-weight: 900;
             color: #0f172a;
-            margin-top: 2px;
+            margin-top: 1px;
           }
           .kpi-sub {
-            font-size: 8.5px;
+            font-size: 9px;
             color: #475569;
-            margin-top: 1px;
+            font-weight: 600;
           }
           .insights-row {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 10px;
-            margin-bottom: 8px;
           }
           .insight-box {
-            border: 1px solid #cbd5e1;
+            border: 1.5px solid #cbd5e1;
             border-radius: 8px;
-            padding: 7px 10px;
+            padding: 6px 10px;
             background: #ffffff;
           }
           .insight-title {
-            font-size: 9px;
-            font-weight: 800;
+            font-size: 9.5px;
+            font-weight: 900;
             text-transform: uppercase;
-            margin-bottom: 4px;
+            margin-bottom: 3px;
             color: #0f172a;
             border-bottom: 1px solid #e2e8f0;
-            padding-bottom: 3px;
+            padding-bottom: 2px;
           }
           .insight-line {
             display: flex;
             justify-content: space-between;
-            font-size: 9.2px;
-            margin-top: 3px;
+            font-size: 9.8px;
+            margin-top: 2px;
           }
           .tables-grid {
-            flex: 1;
             display: grid;
-            grid-template-columns: 1.12fr 0.88fr;
+            grid-template-columns: 1.14fr 0.86fr;
             gap: 10px;
-            align-items: stretch;
+            height: 100%;
+            min-height: 0;
           }
           .table-card {
-            border: 1px solid #cbd5e1;
+            border: 1.5px solid #94a3b8;
             border-radius: 8px;
             overflow: hidden;
-            display: flex;
-            flex-direction: column;
+            display: grid;
+            grid-template-rows: auto 1fr;
+            height: 100%;
             background: #ffffff;
           }
           .table-header {
             background: #0f172a;
             color: #ffffff;
-            padding: 5px 10px;
-            font-size: 9.5px;
+            padding: 6px 10px;
+            font-size: 10px;
             font-weight: 800;
             display: flex;
             justify-content: space-between;
+            align-items: center;
           }
           table {
             width: 100%;
             height: 100%;
             border-collapse: collapse;
-            font-size: 8.8px;
+            font-size: 9.5px;
+          }
+          thead tr {
+            height: 22px;
           }
           th {
-            background: #f1f5f9;
-            color: #1e293b;
+            background: #e2e8f0;
+            color: #0f172a;
             text-transform: uppercase;
-            font-size: 8px;
-            font-weight: 800;
-            padding: 4px 5px;
-            border-bottom: 1px solid #cbd5e1;
+            font-size: 8.5px;
+            font-weight: 900;
+            padding: 3px 6px;
+            border-bottom: 1.5px solid #94a3b8;
             text-align: left;
           }
           td {
-            padding: 3.5px 5px;
-            border-bottom: 1px solid #f1f5f9;
+            padding: 2px 6px;
+            border-bottom: 1px solid #e2e8f0;
             white-space: nowrap;
+            vertical-align: middle;
           }
           tr:nth-child(even) td {
             background: #f8fafc;
           }
           .footer {
-            margin-top: 8px;
-            padding-top: 6px;
-            border-top: 1.5px solid #cbd5e1;
+            padding-top: 4px;
+            border-top: 2px solid #cbd5e1;
             display: flex;
             justify-content: space-between;
-            font-size: 8.8px;
-            color: #475569;
-            font-weight: 600;
+            align-items: center;
+            font-size: 9.5px;
+            color: #334155;
+            font-weight: 700;
           }
         </style>
       </head>
       <body>
         <div class="sheet">
-          <div>
-            <div class="header">
-              <div class="header-left">
-                <img src="${logoUrl}" class="logo" alt="Cardiso Logo" />
-                <div>
-                  <div class="company-tag">CARDISO S.A.S. · ALIMENTOS CARLA — DIRECCIÓN GENERAL Y CONTROL DE CALIDAD</div>
-                  <div class="report-title">INFORME GERENCIAL DE VENTAS, CALIDAD E INVENTARIOS</div>
-                  <div class="report-sub">Administrador General: <strong>${currentUser.name}</strong> · Periodo auditado: <strong>${activePeriodLabel}</strong> (${filteredRows.length} registros procesados)</div>
-                </div>
+          <div class="header">
+            <div class="header-left">
+              <img src="${logoUrl}" class="logo" alt="Cardiso Logo" />
+              <div>
+                <div class="company-tag">CARDISO S.A.S. · ALIMENTOS CARLA — DIRECCIÓN GENERAL Y CONTROL DE CALIDAD</div>
+                <div class="report-title">INFORME GERENCIAL DE VENTAS, CALIDAD E INVENTARIOS</div>
+                <div class="report-sub">Administrador General: <strong>${currentUser.name}</strong> · Periodo auditado: <strong>${activePeriodLabel}</strong> (${filteredRows.length} registros procesados)</div>
               </div>
-              <div class="cutoff-box">
-                <div class="cutoff-label">Cambios actualizados hasta</div>
-                <div class="cutoff-date">${maxDate}</div>
+            </div>
+            <div class="cutoff-box">
+              <div class="cutoff-label">Cambios actualizados hasta</div>
+              <div class="cutoff-date">${maxDate}</div>
+            </div>
+          </div>
+
+          <div class="kpi-row">
+            <div class="kpi-card">
+              <div class="kpi-label">1. Ventas Totales Mes</div>
+              <div class="kpi-val" style="color:#047857;">${formatCOP(globalTotals.totalSales)}</div>
+              <div class="kpi-sub">Incidencia global: ${formatPercent(globalTotals.pctOverSales)}</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">2. Total Devoluciones</div>
+              <div class="kpi-val">${formatCOP(globalTotals.totalCOP)}</div>
+              <div class="kpi-sub">${formatNumber(globalTotals.totalUnits)} unidades totales</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">3. Devolución Comercial (Ruta)</div>
+              <div class="kpi-val" style="color:#b45309;">${formatCOP(globalTotals.commCOP)}</div>
+              <div class="kpi-sub">${formatNumber(globalTotals.commUnits)} unds (Bajar Inventario)</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">4. Devolución Calidad (Planta)</div>
+              <div class="kpi-val" style="color:#0369a1;">${formatCOP(globalTotals.qualCOP)}</div>
+              <div class="kpi-sub">Lechoso: ${globalTotals.lechozoUnits}u · Vacío: ${globalTotals.vacioUnits}u</div>
+            </div>
+          </div>
+
+          <div class="insights-row">
+            <div class="insight-box">
+              <div class="insight-title">🏆 Desempeño de Ventas por Zona</div>
+              <div class="insight-line">
+                <span><strong>Más Vende:</strong> ${topSellingZone ? topSellingZone.consolidatedName : 'N/A'}</span>
+                <strong style="color:#047857;">${topSellingZone ? formatCompactCOP(topSellingZone.monthlySalesCOP) : '$0'}</strong>
+              </div>
+              <div class="insight-line">
+                <span><strong>Menos Vende:</strong> ${lowestSellingZone ? lowestSellingZone.consolidatedName : 'N/A'}</span>
+                <strong style="color:#b45309;">${lowestSellingZone ? formatCompactCOP(lowestSellingZone.monthlySalesCOP) : '$0'}</strong>
               </div>
             </div>
 
-            <div class="kpi-row">
-              <div class="kpi-card">
-                <div class="kpi-label">1. Ventas Totales Mes</div>
-                <div class="kpi-val" style="color:#047857;">${formatCOP(globalTotals.totalSales)}</div>
-                <div class="kpi-sub">Incidencia global: ${formatPercent(globalTotals.pctOverSales)}</div>
+            <div class="insight-box">
+              <div class="insight-title">🔬 Productos Críticos en Planta</div>
+              <div class="insight-line">
+                <span><strong>Más Lechosidad:</strong> ${productAnalytics.topLechozo ? productAnalytics.topLechozo.productName : 'N/A'}</span>
+                <strong style="color:#6d28d9;">${productAnalytics.topLechozo ? `${productAnalytics.topLechozo.lechozoUnits}u (${formatCompactCOP(productAnalytics.topLechozo.lechozoCOP)})` : '0u'}</strong>
               </div>
-              <div class="kpi-card">
-                <div class="kpi-label">2. Total Devoluciones</div>
-                <div class="kpi-val">${formatCOP(globalTotals.totalCOP)}</div>
-                <div class="kpi-sub">${formatNumber(globalTotals.totalUnits)} unidades totales</div>
-              </div>
-              <div class="kpi-card">
-                <div class="kpi-label">3. Devolución Comercial (Ruta)</div>
-                <div class="kpi-val" style="color:#b45309;">${formatCOP(globalTotals.commCOP)}</div>
-                <div class="kpi-sub">${formatNumber(globalTotals.commUnits)} unds (Bajar Inventario)</div>
-              </div>
-              <div class="kpi-card">
-                <div class="kpi-label">4. Devolución Calidad (Planta)</div>
-                <div class="kpi-val" style="color:#0369a1;">${formatCOP(globalTotals.qualCOP)}</div>
-                <div class="kpi-sub">Lechoso: ${globalTotals.lechozoUnits}u · Vacío: ${globalTotals.vacioUnits}u</div>
+              <div class="insight-line">
+                <span><strong>Más Vacío:</strong> ${productAnalytics.topVacio ? productAnalytics.topVacio.productName : 'N/A'}</span>
+                <strong style="color:#0284c7;">${productAnalytics.topVacio ? `${productAnalytics.topVacio.vacioUnits}u (${formatCompactCOP(productAnalytics.topVacio.vacioCOP)})` : '0u'}</strong>
               </div>
             </div>
 
-            <div class="insights-row">
-              <div class="insight-box">
-                <div class="insight-title">🏆 Desempeño de Ventas por Zona</div>
-                <div class="insight-line">
-                  <span><strong>Más Vende:</strong> ${topSellingZone ? topSellingZone.consolidatedName : 'N/A'}</span>
-                  <strong style="color:#047857;">${topSellingZone ? formatCompactCOP(topSellingZone.monthlySalesCOP) : '$0'}</strong>
-                </div>
-                <div class="insight-line">
-                  <span><strong>Menos Vende:</strong> ${lowestSellingZone ? lowestSellingZone.consolidatedName : 'N/A'}</span>
-                  <strong style="color:#b45309;">${lowestSellingZone ? formatCompactCOP(lowestSellingZone.monthlySalesCOP) : '$0'}</strong>
-                </div>
+            <div class="insight-box">
+              <div class="insight-title">📦 Control de Inventario Comercial</div>
+              <div class="insight-line">
+                <span><strong>Bajar Pedido:</strong> ${productAnalytics.topCommercial ? productAnalytics.topCommercial.productName : 'N/A'}</span>
+                <strong style="color:#b45309;">${productAnalytics.topCommercial ? `${productAnalytics.topCommercial.commercialUnits}u` : '0u'}</strong>
               </div>
-
-              <div class="insight-box">
-                <div class="insight-title">🔬 Productos Críticos en Planta</div>
-                <div class="insight-line">
-                  <span><strong>Más Lechosidad:</strong> ${productAnalytics.topLechozo ? productAnalytics.topLechozo.productName : 'N/A'}</span>
-                  <strong style="color:#6d28d9;">${productAnalytics.topLechozo ? `${productAnalytics.topLechozo.lechozoUnits}u (${formatCompactCOP(productAnalytics.topLechozo.lechozoCOP)})` : '0u'}</strong>
-                </div>
-                <div class="insight-line">
-                  <span><strong>Más Vacío:</strong> ${productAnalytics.topVacio ? productAnalytics.topVacio.productName : 'N/A'}</span>
-                  <strong style="color:#0284c7;">${productAnalytics.topVacio ? `${productAnalytics.topVacio.vacioUnits}u (${formatCompactCOP(productAnalytics.topVacio.vacioCOP)})` : '0u'}</strong>
-                </div>
-              </div>
-
-              <div class="insight-box">
-                <div class="insight-title">📦 Control de Inventario Comercial</div>
-                <div class="insight-line">
-                  <span><strong>Bajar Pedido:</strong> ${productAnalytics.topCommercial ? productAnalytics.topCommercial.productName : 'N/A'}</span>
-                  <strong style="color:#b45309;">${productAnalytics.topCommercial ? `${productAnalytics.topCommercial.commercialUnits}u` : '0u'}</strong>
-                </div>
-                <div class="insight-line">
-                  <span><strong>Mejor Rotación:</strong> ${productAnalytics.leastReturnedProduct ? productAnalytics.leastReturnedProduct.productName : 'N/A'}</span>
-                  <strong style="color:#047857;">Solo ${productAnalytics.leastReturnedProduct ? `${productAnalytics.leastReturnedProduct.totalUnits}u` : '0u'}</strong>
-                </div>
+              <div class="insight-line">
+                <span><strong>Mejor Rotación:</strong> ${productAnalytics.leastReturnedProduct ? productAnalytics.leastReturnedProduct.productName : 'N/A'}</span>
+                <strong style="color:#047857;">Solo ${productAnalytics.leastReturnedProduct ? `${productAnalytics.leastReturnedProduct.totalUnits}u` : '0u'}</strong>
               </div>
             </div>
           </div>
