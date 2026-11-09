@@ -21,6 +21,7 @@ import {
   Play,
   Trees,
   FlaskConical,
+  Printer,
 } from 'lucide-react';
 import {
   DEMO_USERS,
@@ -44,6 +45,7 @@ import { BentoGridSkeleton } from './components/ui/skeleton';
 import { Badge } from './components/ui/badge';
 import { Modal } from './components/ui/modal';
 import { ExcelSyncModal } from './components/excel-sync-modal';
+import { ExecutiveReportModal } from './components/executive-report-modal';
 import {
   parseReturnsExcelWorkbook,
   recalculateZonesFromRows,
@@ -113,13 +115,16 @@ export function App() {
   const [isCarouselPlaying, setIsCarouselPlaying] = useState<boolean>(true);
   const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [isExcelModalOpen, setIsExcelModalOpen] = useState(false);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
     // Al abrir el link, NUNCA iniciar sesión automáticamente.
     // Solo restaurar si el usuario ya inició sesión previamente en esta sesión de navegador.
     try {
       const saved = sessionStorage.getItem('retorna_session_user');
       if (saved) {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved) as UserProfile;
+        const freshMatch = DEMO_USERS.find((u) => u.id === parsed.id);
+        return freshMatch || parsed;
       }
     } catch {}
     return null;
@@ -783,6 +788,19 @@ export function App() {
             </div>
 
             {(currentUser.role === 'ADMIN' ||
+              currentUser.role === 'CALIDAD') && (
+              <button
+                type="button"
+                onClick={() => setIsReportModalOpen(true)}
+                title="Generar Informe Ejecutivo Detallado con Logo de la Empresa (Sebastián)"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-amber-400/50 bg-amber-500/20 hover:bg-amber-500/30 px-3 py-1.5 text-xs font-bold text-amber-200 shadow-sm transition-all"
+              >
+                <Printer className="h-3.5 w-3.5 text-amber-300" />
+                <span className="hidden sm:inline">Informe Ejecutivo</span>
+              </button>
+            )}
+
+            {(currentUser.role === 'ADMIN' ||
               currentUser.role === 'RECEPCION' ||
               currentUser.role === 'CALIDAD') && (
               <button
@@ -958,6 +976,7 @@ export function App() {
             onSelectLot={handleSelectLotFromDashboard}
             onUpdateZoneSales={handleUpdateZoneSales}
             onOpenQuickGuide={() => setIsGuideOpen(true)}
+            onOpenExecutiveReport={() => setIsReportModalOpen(true)}
           />
         ) : activeTab === 'WORKBENCH' ? (
           <ReturnsWorkbench
@@ -1013,6 +1032,15 @@ export function App() {
         open={isExcelModalOpen}
         onClose={() => setIsExcelModalOpen(false)}
         onSyncItems={handleSyncExcelItems}
+      />
+
+      {/* Modal de Informe Ejecutivo Detallado con Logo Oficial (Sebastián) */}
+      <ExecutiveReportModal
+        open={isReportModalOpen}
+        onClose={() => setIsReportModalOpen(false)}
+        zones={zones}
+        returnRows={computedRows}
+        currentUser={currentUser}
       />
 
       {/* Modal de Guía Fácil Paso a Paso */}

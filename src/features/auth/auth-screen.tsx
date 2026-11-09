@@ -84,7 +84,21 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
       setIsSubmitting(false);
       if (mode === 'login') {
         const targetEmail = (email || '').trim().toLowerCase();
-        const matched = DEMO_USERS.find((u) => u.email.toLowerCase() === targetEmail);
+        const emailAliases: Record<string, string> = {
+          'sebastian@alimentoscarla.co': 'gerencia@alimentoscarla.co',
+          'admin@alimentoscarla.co': 'gerencia@alimentoscarla.co',
+          'z02.villadiego@alimentoscarla.co': 'z02.restrepo@alimentoscarla.co',
+          'z15.montilla@alimentoscarla.co': 'z02.restrepo@alimentoscarla.co',
+          'z03.arango@alimentoscarla.co': 'z03.gonzalez@alimentoscarla.co',
+          'z04.restrepo@alimentoscarla.co': 'z04.calderon@alimentoscarla.co',
+          'z05.borja@alimentoscarla.co': 'z05.rodolfo@alimentoscarla.co',
+          'z06.giraldo@alimentoscarla.co': 'z06.sandra@alimentoscarla.co',
+          'z07.bonilla@alimentoscarla.co': 'z07.martinez@alimentoscarla.co',
+          'z08.quiroz@alimentoscarla.co': 'z08.restrepo@alimentoscarla.co',
+          'z10.jaraba@alimentoscarla.co': 'z10.restrepo@alimentoscarla.co',
+        };
+        const resolvedEmail = emailAliases[targetEmail] || targetEmail;
+        const matched = DEMO_USERS.find((u) => u.email.toLowerCase() === resolvedEmail);
 
         if (!matched) {
           setAuthError('Correo electrónico no registrado en el sistema.');

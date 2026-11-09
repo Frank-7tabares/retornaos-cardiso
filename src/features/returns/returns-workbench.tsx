@@ -21,6 +21,7 @@ import {
   Table2,
   LayoutList,
   FileSpreadsheet,
+  Calendar,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { BentoCard } from '../../components/ui/bento-card';
@@ -134,6 +135,7 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
   const [forceTableOnMobile, setForceTableOnMobile] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [lotFilter, setLotFilter] = useState<string>('ALL');
+  const [dateFilter, setDateFilter] = useState<string>('ALL');
   const [causeFilter, setCauseFilter] = useState<
     'ALL' | 'PROX_VENCER_GROUP' | 'CALIDAD_GROUP' | ReturnCauseKey
   >('ALL');
@@ -244,6 +246,27 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
     return Array.from(map.values()).sort((a, b) => b.units - a.units);
   }, [returnRows, activeZone, searchAllZonesForLot]);
 
+  // Extract all unique Dates available across rows (sorted newest to oldest)
+  const availableDates = useMemo(() => {
+    const map = new Map<string, { date: string; count: number; units: number }>();
+    const sourceRows = searchAllZonesForLot
+      ? returnRows
+      : returnRows.filter((r) => !activeZone || r.zoneId === activeZone.id);
+
+    for (const r of sourceRows) {
+      if (!r.date) continue;
+      const prev = map.get(r.date) || {
+        date: r.date,
+        count: 0,
+        units: 0,
+      };
+      prev.count += 1;
+      prev.units += r.qtyToReceive;
+      map.set(r.date, prev);
+    }
+    return Array.from(map.values()).sort((a, b) => b.date.localeCompare(a.date));
+  }, [returnRows, activeZone, searchAllZonesForLot]);
+
   const handleSelectZone = (newZoneId: string) => {
     if (newZoneId === selectedZoneId) return;
     setIsLoadingZone(true);
@@ -293,6 +316,7 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
     if (!activeZone) return [];
     return returnRows.filter((r) => {
       if (!searchAllZonesForLot && r.zoneId !== activeZone.id) return false;
+      if (dateFilter !== 'ALL' && r.date !== dateFilter) return false;
       if (lotFilter !== 'ALL' && r.lotNumber !== lotFilter) return false;
       if (causeFilter === 'PROX_VENCER_GROUP') {
         if (r.causes.proxVencer + r.causes.vencido <= 0) return false;
@@ -326,6 +350,7 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
     returnRows,
     activeZone,
     searchAllZonesForLot,
+    dateFilter,
     lotFilter,
     causeFilter,
     statusFilter,
@@ -931,16 +956,21 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
         </button>
       </div>
 
-      {/* Interactive Lot & Cause Explorer Bar (Mobile Responsive) */}
+      {/* Interactive Date, Lot & Cause Explorer Bar (Mobile Responsive) */}
       <div className="rounded-2xl border border-white/60 dark:border-white/[0.14] bg-white/80 dark:bg-slate-900/65 backdrop-blur-2xl p-3.5 sm:p-4 shadow-xl space-y-3">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-2.5">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
-              <Tag className="h-4 w-4" />
+              <Calendar className="h-4 w-4" />
             </div>
             <div>
               <div className="text-xs font-semibold text-neutral-900 dark:text-white flex flex-wrap items-center gap-1.5">
-                <span>Filtro por Lote (Col E) y Causa</span>
+                <span>Filtro por Fecha (Col A), Lote (Col E) y Causa</span>
+                {dateFilter !== 'ALL' && (
+                  <Badge variant="success" dot>
+                    Fecha: {dateFilter}
+                  </Badge>
+                )}
                 {lotFilter !== 'ALL' && (
                   <Badge variant="indigo" dot>
                     Lote L-{lotFilter}
@@ -948,12 +978,12 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
                 )}
               </div>
               <p className="text-[11px] text-neutral-500 dark:text-slate-300">
-                Filtra tus devoluciones por número de lote o por motivo de devolución.
+                Filtra tus devoluciones por fecha exacta, número de lote o motivo de devolución.
               </p>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 lg:flex flex-wrap items-center gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex flex-wrap items-center gap-2">
             {/* Toggle Global Lot Search across all zones (Solo Admin, Calidad, Recepción) */}
             {currentUser.role !== 'VENDEDOR' && currentUser.role !== 'PDV' && (
               <button
@@ -973,6 +1003,20 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
                 </span>
               </button>
             )}
+
+            {/* Dropdown Filter by Date */}
+            <select
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value)}
+              className="w-full sm:w-auto rounded-xl border border-neutral-300 dark:border-white/15 bg-white/90 dark:bg-slate-950/80 px-3 py-2 font-mono text-xs font-semibold text-emerald-600 dark:text-emerald-300 focus:border-emerald-500 focus:outline-none"
+            >
+              <option value="ALL">Todas las Fechas ({availableDates.length})</option>
+              {availableDates.map((item) => (
+                <option key={item.date} value={item.date}>
+                  📅 {item.date} ({item.units} unds · {item.count} reg.)
+                </option>
+              ))}
+            </select>
 
             {/* Dropdown Filter by Cause */}
             <select
@@ -1021,12 +1065,14 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
               ))}
             </select>
 
-            {(lotFilter !== 'ALL' ||
+            {(dateFilter !== 'ALL' ||
+              lotFilter !== 'ALL' ||
               causeFilter !== 'ALL' ||
               searchAllZonesForLot) && (
               <button
                 type="button"
                 onClick={() => {
+                  setDateFilter('ALL');
                   setLotFilter('ALL');
                   setCauseFilter('ALL');
                   setSearchAllZonesForLot(false);
@@ -1040,6 +1086,47 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
             )}
           </div>
         </div>
+
+        {/* Interactive Date Pills */}
+        {availableDates.length > 0 && (
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+            <span className="text-[11px] font-medium text-neutral-500 dark:text-slate-400 shrink-0 mr-1">
+              Fechas:
+            </span>
+            <button
+              type="button"
+              onClick={() => setDateFilter('ALL')}
+              className={`shrink-0 rounded-lg px-2.5 py-1 text-xs font-medium transition-all ${
+                dateFilter === 'ALL'
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'bg-neutral-200/70 dark:bg-white/10 text-neutral-700 dark:text-slate-300 hover:bg-neutral-300 dark:hover:bg-white/20'
+              }`}
+            >
+              Todas
+            </button>
+            {availableDates.map((item) => (
+              <button
+                key={item.date}
+                type="button"
+                onClick={() =>
+                  setDateFilter((prev) =>
+                    prev === item.date ? 'ALL' : item.date
+                  )
+                }
+                className={`shrink-0 inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 font-mono text-xs font-medium transition-all ${
+                  dateFilter === item.date
+                    ? 'border-emerald-400 bg-emerald-600 text-white shadow-sm'
+                    : 'border-neutral-300/80 dark:border-white/10 bg-white/60 dark:bg-slate-950/60 text-neutral-800 dark:text-slate-200 hover:border-emerald-400/50'
+                }`}
+              >
+                <span>📅 {item.date}</span>
+                <span className="rounded bg-black/20 px-1 text-[10px] opacity-80">
+                  {item.units}u
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Interactive Lot Pills */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1">

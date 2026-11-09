@@ -111,6 +111,7 @@ export function resolveSheetZone(sheetName: string): {
     const rawCode = zMatch[1].toUpperCase();
     const numPart = rawCode.slice(1).padStart(2, '0');
     const zoneId = `Z${numPart}`;
+    if (zoneId === 'Z15') return null;
     const existingZone = REAL_ZONES_SUMMARY.find((z) => z.id === zoneId);
     return {
       zoneId,

@@ -22,6 +22,11 @@ import {
   Camera,
   Tag,
   Stethoscope,
+  Calendar,
+  ArrowUpDown,
+  Award,
+  Printer,
+  PackageCheck,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { BentoCard } from '../../components/ui/bento-card';
@@ -49,6 +54,7 @@ interface BentoDashboardProps {
   onSelectLot: (lotNumber: string) => void;
   onUpdateZoneSales: (zoneId: string, newSalesCOP: number) => void;
   onOpenQuickGuide: () => void;
+  onOpenExecutiveReport?: () => void;
 }
 
 export const BentoDashboard: React.FC<BentoDashboardProps> = ({
@@ -58,10 +64,16 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
   onSelectLot,
   onUpdateZoneSales,
   onOpenQuickGuide,
+  onOpenExecutiveReport,
 }) => {
   const [channelFilter, setChannelFilter] = useState<'ALL' | ZoneType>('ALL');
   const [metricMode, setMetricMode] = useState<'COP' | 'UNITS'>('COP');
   const [searchQuery, setSearchQuery] = useState('');
+  const [dateFilter, setDateFilter] = useState<string>('ALL');
+  const [escalafonOrder, setEscalafonOrder] = useState<'ASC' | 'DESC'>('ASC');
+  const [escalafonCategory, setEscalafonCategory] = useState<
+    'ALL' | 'COMERCIAL' | 'CALIDAD'
+  >('ALL');
   const [showWorkflowBanner, setShowWorkflowBanner] = useState(true);
   const [selectedCauseKey, setSelectedCauseKey] =
     useState<ReturnCauseKey>('lechozo');
@@ -70,10 +82,75 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
   );
   const [salesInput, setSalesInput] = useState('');
 
-  const enrichedZones = useMemo(
-    () => zones.map((z) => computeZoneMetrics(z)),
-    [zones]
-  );
+  // Fechas disponibles y fecha máxima de corte ("hasta el día que están los cambios")
+  const { availableDates, minDate, maxDate } = useMemo(() => {
+    const set = new Set<string>();
+    for (const r of returnRows) {
+      if (r.date) set.add(r.date);
+    }
+    const sorted = Array.from(set).sort();
+    return {
+      availableDates: [...sorted].reverse(),
+      minDate: sorted[0] || '2026-11-01',
+      maxDate: sorted[sorted.length - 1] || '2026-11-05',
+    };
+  }, [returnRows]);
+
+  // Filas filtradas por fecha seleccionada en la pantalla de inicio
+  const dateFilteredRows = useMemo(() => {
+    if (dateFilter === 'ALL') return returnRows;
+    return returnRows.filter((r) => r.date === dateFilter);
+  }, [returnRows, dateFilter]);
+
+  const enrichedZones = useMemo(() => {
+    const activeZones = zones.filter((z) => z.id !== 'Z15');
+    return activeZones.map((z) => {
+      if (dateFilter === 'ALL') {
+        return computeZoneMetrics(z);
+      }
+      const zRows = dateFilteredRows.filter((r) => r.zoneId === z.id);
+      const customZone: ZoneSummary = {
+        ...z,
+        lineItemsCount: zRows.length,
+        unitsByCause: {
+          aCobrar: 0,
+          xFecha: 0,
+          vacio: 0,
+          proxVencer: 0,
+          vencido: 0,
+          abomba: 0,
+          lechozo: 0,
+        },
+        copByCause: {
+          aCobrar: 0,
+          xFecha: 0,
+          vacio: 0,
+          proxVencer: 0,
+          vencido: 0,
+          abomba: 0,
+          lechozo: 0,
+        },
+      };
+      for (const r of zRows) {
+        customZone.unitsByCause.aCobrar += r.causes.aCobrar;
+        customZone.unitsByCause.xFecha += r.causes.xFecha;
+        customZone.unitsByCause.vacio += r.causes.vacio;
+        customZone.unitsByCause.proxVencer += r.causes.proxVencer;
+        customZone.unitsByCause.vencido += r.causes.vencido;
+        customZone.unitsByCause.abomba += r.causes.abomba;
+        customZone.unitsByCause.lechozo += r.causes.lechozo;
+
+        customZone.copByCause.aCobrar += r.copByCause.aCobrar;
+        customZone.copByCause.xFecha += r.copByCause.xFecha;
+        customZone.copByCause.vacio += r.copByCause.vacio;
+        customZone.copByCause.proxVencer += r.copByCause.proxVencer;
+        customZone.copByCause.vencido += r.copByCause.vencido;
+        customZone.copByCause.abomba += r.copByCause.abomba;
+        customZone.copByCause.lechozo += r.copByCause.lechozo;
+      }
+      return computeZoneMetrics(customZone);
+    });
+  }, [zones, dateFilteredRows, dateFilter]);
 
   const filteredZones = useMemo(() => {
     return enrichedZones.filter((z) => {
@@ -153,9 +230,131 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
   }, [filteredZones]);
 
   const unconciledCount = useMemo(
-    () => returnRows.filter((r) => r.reconciliationStatus === 'REVISAR').length,
-    [returnRows]
+    () =>
+      dateFilteredRows.filter((r) => r.reconciliationStatus === 'REVISAR')
+        .length,
+    [dateFilteredRows]
   );
+
+  // Escalafón de productos devueltos (de menor a mayor o de mayor a menor) por Calidad y Comercial
+  const productEscalafonData = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        productName: string;
+        totalUnits: number;
+        totalCOP: number;
+        commercialUnits: number;
+        commercialCOP: number;
+        qualityUnits: number;
+        qualityCOP: number;
+        lechozoUnits: number;
+        vacioUnits: number;
+        proxVencerUnits: number;
+        lots: Set<string>;
+        zones: Set<string>;
+      }
+    >();
+
+    for (const r of dateFilteredRows) {
+      const key = r.productName;
+      let item = map.get(key);
+      if (!item) {
+        item = {
+          productName: r.productName,
+          totalUnits: 0,
+          totalCOP: 0,
+          commercialUnits: 0,
+          commercialCOP: 0,
+          qualityUnits: 0,
+          qualityCOP: 0,
+          lechozoUnits: 0,
+          vacioUnits: 0,
+          proxVencerUnits: 0,
+          lots: new Set<string>(),
+          zones: new Set<string>(),
+        };
+        map.set(key, item);
+      }
+      const cUnits =
+        r.causes.aCobrar + r.causes.proxVencer + r.causes.vencido;
+      const qUnits =
+        r.causes.vacio + r.causes.xFecha + r.causes.abomba + r.causes.lechozo;
+
+      item.totalUnits += r.qtyToReceive;
+      item.totalCOP += r.totalValueCOP;
+      item.commercialUnits += cUnits;
+      item.commercialCOP += r.commercialValueCOP;
+      item.qualityUnits += qUnits;
+      item.qualityCOP += r.qualityValueCOP;
+      item.lechozoUnits += r.causes.lechozo;
+      item.vacioUnits += r.causes.vacio;
+      item.proxVencerUnits += r.causes.proxVencer + r.causes.vencido;
+      if (r.lotNumber && r.lotNumber !== 'S/L') item.lots.add(r.lotNumber);
+      item.zones.add(r.zoneId);
+    }
+
+    let list = Array.from(map.values());
+    if (escalafonCategory === 'COMERCIAL') {
+      list = list.filter((p) => p.commercialUnits > 0);
+    } else if (escalafonCategory === 'CALIDAD') {
+      list = list.filter((p) => p.qualityUnits > 0);
+    }
+
+    const sorted = [...list].sort((a, b) => {
+      const valA =
+        escalafonCategory === 'COMERCIAL'
+          ? a.commercialUnits
+          : escalafonCategory === 'CALIDAD'
+          ? a.qualityUnits
+          : a.totalUnits;
+      const valB =
+        escalafonCategory === 'COMERCIAL'
+          ? b.commercialUnits
+          : escalafonCategory === 'CALIDAD'
+          ? b.qualityUnits
+          : b.totalUnits;
+      if (escalafonOrder === 'ASC') {
+        return valA - valB || a.totalCOP - b.totalCOP;
+      }
+      return valB - valA || b.totalCOP - a.totalCOP;
+    });
+
+    const allList = Array.from(map.values());
+    const topLechozo =
+      [...allList]
+        .filter((p) => p.lechozoUnits > 0)
+        .sort((a, b) => b.lechozoUnits - a.lechozoUnits)[0] || null;
+    const topVacio =
+      [...allList]
+        .filter((p) => p.vacioUnits > 0)
+        .sort((a, b) => b.vacioUnits - a.vacioUnits)[0] || null;
+    const topCommercial =
+      [...allList]
+        .filter((p) => p.commercialUnits > 0)
+        .sort((a, b) => b.commercialUnits - a.commercialUnits)[0] || null;
+
+    return {
+      sorted,
+      topLechozo,
+      topVacio,
+      topCommercial,
+    };
+  }, [dateFilteredRows, escalafonOrder, escalafonCategory]);
+
+  // Zona que MÁS vende y zona que MENOS vende
+  const zoneSalesRanking = useMemo(() => {
+    const rutas = enrichedZones.filter(
+      (z) => z.type === 'RUTA_VENDEDOR' && z.monthlySalesCOP > 0
+    );
+    const bySales = [...rutas].sort(
+      (a, b) => b.monthlySalesCOP - a.monthlySalesCOP
+    );
+    return {
+      topZone: bySales[0] || null,
+      bottomZone: bySales[bySales.length - 1] || null,
+    };
+  }, [enrichedZones]);
 
   const topLots = useMemo(() => {
     const map = new Map<
@@ -169,7 +368,7 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
         zonesInvolved: Set<string>;
       }
     >();
-    for (const r of returnRows) {
+    for (const r of dateFilteredRows) {
       if (!r.lotNumber || r.movementType !== 'AVERIA_DEVOLUCION') continue;
       const prev = map.get(r.lotNumber) || {
         lot: r.lotNumber,
@@ -193,7 +392,7 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
     return Array.from(map.values())
       .sort((a, b) => b.valueCOP - a.valueCOP)
       .slice(0, 6);
-  }, [returnRows]);
+  }, [dateFilteredRows]);
 
   const selectedCauseMeta = useMemo(
     () =>
@@ -239,38 +438,117 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
           <div className="max-w-2xl space-y-2.5">
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="success" dot>
-                Corte Octubre 16 · Trazabilidad de Lotes y Fotos Activa
+                📅 Cambios actualizados hasta el día: {maxDate}
               </Badge>
-              <span className="rounded-full bg-white/15 backdrop-blur-md border border-white/20 px-3 py-0.5 text-xs font-medium text-emerald-200">
-                Del Campo y Planta a los 23 Vendedores y Puntos de Venta
+              <span className="rounded-full bg-emerald-500/20 backdrop-blur-md border border-emerald-400/40 px-3 py-0.5 text-xs font-semibold text-emerald-200">
+                Periodo cargado: {minDate} al {maxDate} · 14 Vendedores Oficiales
               </span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-              Centro de Control, Trazabilidad de Lotes y Evidencia Fotográfica
+              Centro de Control Gerencial, Escalafón de Inventarios y Lotes
             </h1>
             <p className="text-xs sm:text-sm text-slate-200/95 leading-relaxed">
-              Reemplaza la hoja <strong>% DE VENTAS</strong> y las <strong>23 pestañas individuales</strong> por un panel único. Ahora puedes <strong>filtrar por N° de Lote</strong>, subir <strong>fotos reales del producto devuelto</strong> y ver el diagnóstico técnico de cada causa.
+              Información actualizada hasta el <strong>{maxDate}</strong>. Filtra por <strong>Fecha</strong> o por <strong>N° de Lote</strong>, consulta el <strong>Escalafón de Menor a Mayor</strong> de productos devueltos por <strong>Calidad y Comercial</strong> para bajar inventarios, y genera el <strong>Informe Ejecutivo Oficial</strong>.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3 shrink-0">
+            {onOpenExecutiveReport && (
+              <button
+                type="button"
+                onClick={onOpenExecutiveReport}
+                className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 border border-emerald-300/40 px-4 py-2.5 text-xs font-bold text-white shadow-xl shadow-emerald-600/30 transition-all duration-200 hover:-translate-y-0.5"
+              >
+                <Printer className="h-4 w-4" />
+                Generar Informe Detallado (Sebastián)
+              </button>
+            )}
             <button
               type="button"
               onClick={onOpenQuickGuide}
               className="inline-flex items-center gap-2 rounded-2xl border border-white/25 bg-white/15 hover:bg-white/25 backdrop-blur-xl px-4 py-2.5 text-xs font-semibold text-white shadow-lg transition-all duration-200 hover:-translate-y-0.5"
             >
               <HelpCircle className="h-4 w-4 text-emerald-300" />
-              ¿Cómo funciona? (Ver Guía Fácil)
+              Guía Fácil
             </button>
             <button
               type="button"
               onClick={() => onSelectZone('Z01')}
-              className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 hover:bg-emerald-500 px-4 py-2.5 text-xs font-semibold text-white shadow-lg shadow-emerald-600/30 transition-all duration-200 hover:-translate-y-0.5"
+              className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 hover:bg-indigo-500 px-4 py-2.5 text-xs font-semibold text-white shadow-lg shadow-indigo-600/30 transition-all duration-200 hover:-translate-y-0.5"
             >
               <Camera className="h-4 w-4" />
-              Ir a Planilla / Subir Foto
+              Ir a Planilla / Lotes
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* Barra de Corte de Fecha y Filtro por Fecha en la Pantalla de Inicio */}
+      <div className="rounded-2xl border border-emerald-500/30 bg-slate-900/80 backdrop-blur-xl p-3.5 sm:px-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between shadow-lg">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/20 border border-emerald-400/30 text-emerald-300">
+            <Calendar className="h-4 w-4" />
+          </div>
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-bold text-white">
+                Fecha de Corte en Sistema (Hasta el día que están los cambios):
+              </span>
+              <span className="rounded-lg bg-emerald-500/25 border border-emerald-400/40 px-2.5 py-0.5 font-mono text-xs font-extrabold text-emerald-300">
+                {maxDate}
+              </span>
+              {dateFilter !== 'ALL' && (
+                <Badge variant="warning" dot>
+                  Filtrando solo fecha: {dateFilter}
+                </Badge>
+              )}
+            </div>
+            <p className="text-[11px] text-slate-300">
+              Filtra todo el resumen de inicio por una fecha específica o visualiza el acumulado completo ({availableDates.length} fechas registradas).
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setDateFilter('ALL')}
+            className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
+              dateFilter === 'ALL'
+                ? 'bg-emerald-600 text-white shadow-sm'
+                : 'bg-slate-800/90 text-slate-300 hover:text-white border border-white/10'
+            }`}
+          >
+            Todas las Fechas ({minDate} a {maxDate})
+          </button>
+          {availableDates.slice(0, 6).map((d) => (
+            <button
+              key={d}
+              type="button"
+              onClick={() => setDateFilter(dateFilter === d ? 'ALL' : d)}
+              className={`rounded-xl px-2.5 py-1.5 font-mono text-xs font-semibold transition-all ${
+                dateFilter === d
+                  ? 'bg-emerald-500 text-slate-950 font-bold shadow-sm'
+                  : 'bg-slate-800/80 text-emerald-300 hover:bg-slate-700 border border-emerald-500/25'
+              }`}
+            >
+              📅 {d}
+            </button>
+          ))}
+          {availableDates.length > 6 && (
+            <select
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value)}
+              className="rounded-xl border border-white/20 bg-slate-900 px-2.5 py-1.5 font-mono text-xs text-white focus:border-emerald-400 focus:outline-none"
+            >
+              <option value="ALL">Ver todas ({availableDates.length})</option>
+              {availableDates.map((d) => (
+                <option key={d} value={d}>
+                  Fecha: {d}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
       </div>
 
@@ -351,7 +629,7 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
         <div className="inline-flex flex-wrap items-center gap-1 rounded-2xl border border-white/30 dark:border-white/15 bg-white/75 dark:bg-slate-900/70 p-1 backdrop-blur-xl shadow-lg">
           {[
             { id: 'ALL', label: 'Todos los Canales (23)' },
-            { id: 'RUTA_VENDEDOR', label: 'Vendedores Z01–Z15 (14)' },
+            { id: 'RUTA_VENDEDOR', label: 'Vendedores Z01–Z16 (14)' },
             { id: 'CLIENTE_ESPECIAL_Z14', label: 'Clientes Z14 (4)' },
             { id: 'PUNTO_DE_VENTA', label: 'Puntos de Venta (5)' },
           ].map((tab) => (
@@ -494,6 +772,272 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
           </div>
         </BentoCard>
       </div>
+
+      {/* ===================================================================== */}
+      {/* RESUMEN GERENCIAL Y ESCALAFÓN DE PRODUCTOS (DE MENOR A MAYOR ↑)       */}
+      {/* ===================================================================== */}
+      <BentoCard noPadding className="overflow-hidden">
+        <div className="border-b border-neutral-200/70 dark:border-white/10 bg-slate-950/50 p-5 space-y-4">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <PackageCheck className="h-4 w-4 text-emerald-400" />
+                <h2 className="text-base font-bold text-neutral-900 dark:text-white">
+                  Escalafón de Productos Devueltos por Calidad y Comercial ({escalafonOrder === 'ASC' ? 'De Menor a Mayor ↑' : 'De Mayor a Menor ↓'})
+                </h2>
+                <Badge variant="success" dot>
+                  Corte al {dateFilter === 'ALL' ? maxDate : dateFilter}
+                </Badge>
+              </div>
+              <p className="mt-1 text-xs text-neutral-600 dark:text-slate-300">
+                Resumen ordenado de productos devueltos por <strong>Calidad (Lechosidad, Vacío)</strong> y <strong>Comercial (Próx. a Vencer, A Cobrar)</strong> para <strong>bajar inventarios en ruta</strong> y <strong>tomar correctivos en planta</strong>.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <div className="inline-flex rounded-xl border border-white/15 bg-slate-900 p-1">
+                <button
+                  type="button"
+                  onClick={() => setEscalafonOrder('ASC')}
+                  className={`inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
+                    escalafonOrder === 'ASC'
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'text-slate-300 hover:text-white'
+                  }`}
+                >
+                  <ArrowUpDown className="h-3.5 w-3.5" />
+                  De Menor a Mayor (↑)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEscalafonOrder('DESC')}
+                  className={`inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
+                    escalafonOrder === 'DESC'
+                      ? 'bg-indigo-600 text-white shadow-sm'
+                      : 'text-slate-300 hover:text-white'
+                  }`}
+                >
+                  <ArrowUpDown className="h-3.5 w-3.5" />
+                  De Mayor a Menor (↓)
+                </button>
+              </div>
+
+              <div className="inline-flex rounded-xl border border-white/15 bg-slate-900 p-1">
+                {[
+                  { id: 'ALL', label: 'Todos' },
+                  { id: 'COMERCIAL', label: 'Comercial (Inventario)' },
+                  { id: 'CALIDAD', label: 'Calidad (Planta)' },
+                ].map((cat) => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() =>
+                      setEscalafonCategory(
+                        cat.id as 'ALL' | 'COMERCIAL' | 'CALIDAD'
+                      )
+                    }
+                    className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
+                      escalafonCategory === cat.id
+                        ? 'bg-amber-500 text-slate-950 font-bold'
+                        : 'text-slate-300 hover:text-white'
+                    }`}
+                  >
+                    {cat.label}
+                  </button>
+                ))}
+              </div>
+
+              {onOpenExecutiveReport && (
+                <button
+                  type="button"
+                  onClick={onOpenExecutiveReport}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 px-3.5 py-2 text-xs font-bold text-white shadow-md shadow-emerald-600/20 transition-all"
+                >
+                  <Printer className="h-3.5 w-3.5" />
+                  Abrir Informe Detallado con Logo
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* 3 Tarjetas de Resumen Rápido: Ventas por Zona, Críticos Lechosidad/Vacío y Comercial */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="rounded-2xl border border-emerald-500/30 bg-slate-900/90 p-3.5 space-y-1.5">
+              <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-emerald-400">
+                <span className="flex items-center gap-1">
+                  <Award className="h-3.5 w-3.5" />
+                  ¿Qué Zona Vende Más y Cuál Menos?
+                </span>
+                <span>Ventas Mes</span>
+              </div>
+              {zoneSalesRanking.topZone && (
+                <div className="flex items-center justify-between text-xs pt-1">
+                  <span className="text-slate-200 truncate">
+                    🏆 <strong>Más vende:</strong> {zoneSalesRanking.topZone.consolidatedName}
+                  </span>
+                  <span className="font-mono font-bold text-emerald-300 shrink-0 ml-2">
+                    {formatCompactCOP(zoneSalesRanking.topZone.monthlySalesCOP)}
+                  </span>
+                </div>
+              )}
+              {zoneSalesRanking.bottomZone && (
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-slate-300 truncate">
+                    📉 <strong>Menos vende:</strong> {zoneSalesRanking.bottomZone.consolidatedName}
+                  </span>
+                  <span className="font-mono font-bold text-amber-300 shrink-0 ml-2">
+                    {formatCompactCOP(zoneSalesRanking.bottomZone.monthlySalesCOP)}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-2xl border border-sky-500/30 bg-slate-900/90 p-3.5 space-y-1.5">
+              <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-sky-400">
+                <span className="flex items-center gap-1">
+                  <FlaskConical className="h-3.5 w-3.5" />
+                  ¿Cuál Devuelven Más por Lechosidad y Vacío?
+                </span>
+                <span>Planta</span>
+              </div>
+              {productEscalafonData.topLechozo && (
+                <div className="flex items-center justify-between text-xs pt-1">
+                  <span className="text-slate-200 truncate">
+                    🥛 <strong>Lechosidad:</strong> {productEscalafonData.topLechozo.productName}
+                  </span>
+                  <span className="font-mono font-bold text-violet-300 shrink-0 ml-2">
+                    {productEscalafonData.topLechozo.lechozoUnits} unds
+                  </span>
+                </div>
+              )}
+              {productEscalafonData.topVacio && (
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-slate-200 truncate">
+                    📦 <strong>Vacío:</strong> {productEscalafonData.topVacio.productName}
+                  </span>
+                  <span className="font-mono font-bold text-sky-300 shrink-0 ml-2">
+                    {productEscalafonData.topVacio.vacioUnits} unds
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-2xl border border-amber-500/30 bg-slate-900/90 p-3.5 space-y-1.5">
+              <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-amber-400">
+                <span className="flex items-center gap-1">
+                  <Briefcase className="h-3.5 w-3.5" />
+                  Control de Inventarios (Comercial)
+                </span>
+                <span>Rotación</span>
+              </div>
+              {productEscalafonData.topCommercial && (
+                <div className="flex items-center justify-between text-xs pt-1">
+                  <span className="text-slate-200 truncate">
+                    ⚠️ <strong>Bajar stock:</strong> {productEscalafonData.topCommercial.productName}
+                  </span>
+                  <span className="font-mono font-bold text-amber-300 shrink-0 ml-2">
+                    {productEscalafonData.topCommercial.commercialUnits} unds
+                  </span>
+                </div>
+              )}
+              <div className="text-[11px] text-slate-400">
+                Usa la tabla inferior en escalafón para ajustar pedidos por ruta y lote.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Tabla del Escalafón de Productos (De Menor a Mayor / Mayor a Menor) */}
+        <div className="overflow-x-auto max-h-96">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b border-neutral-200/70 dark:border-white/10 bg-neutral-100/70 dark:bg-slate-950/70 text-[11px] font-semibold uppercase tracking-wider text-neutral-600 dark:text-slate-300">
+                <th className="py-3 pl-5 pr-2">Escalafón</th>
+                <th className="px-3 py-3">Producto / Referencia</th>
+                <th className="px-3 py-3 text-right text-amber-600 dark:text-amber-300">
+                  Comercial (Und / $)
+                </th>
+                <th className="px-3 py-3 text-right text-sky-600 dark:text-sky-300">
+                  Calidad Planta (Und / $)
+                </th>
+                <th className="px-2.5 py-3 text-center text-violet-400">
+                  Lechosidad
+                </th>
+                <th className="px-2.5 py-3 text-center text-cyan-400">
+                  Vacío
+                </th>
+                <th className="px-3 py-3 text-right">Total Devuelto</th>
+                <th className="py-3 pl-3 pr-5">Acción p/ Bajar Inventario y Correctivo</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-neutral-200/50 dark:divide-white/[0.07] text-xs">
+              {productEscalafonData.sorted.map((prod, idx) => {
+                const actionLabel =
+                  prod.commercialUnits > prod.qualityUnits
+                    ? '📉 Bajar inventario en ruta / Ajustar pedido comercial'
+                    : prod.lechozoUnits >= prod.vacioUnits && prod.lechozoUnits > 0
+                    ? '🔬 Correctivo Planta: Revisar choque térmico (Lechosidad)'
+                    : prod.vacioUnits > 0
+                    ? '🛡️ Correctivo Planta: Auditar sellado al vacío'
+                    : '✅ Rotación estable (Mantener stock)';
+
+                return (
+                  <tr
+                    key={prod.productName}
+                    className="hover:bg-indigo-500/10 dark:hover:bg-white/[0.05] transition-colors"
+                  >
+                    <td className="py-2.5 pl-5 pr-2 font-mono font-bold text-indigo-400">
+                      #{idx + 1}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <div className="font-semibold text-neutral-900 dark:text-white">
+                        {prod.productName}
+                      </div>
+                      <div className="text-[11px] font-mono text-neutral-500 dark:text-slate-400">
+                        {prod.zones.size} zona(s) · Lotes:{' '}
+                        {Array.from(prod.lots).slice(0, 4).join(', ') || 'S/L'}
+                      </div>
+                    </td>
+                    <td className="px-3 py-2.5 text-right font-mono">
+                      <span className="font-bold text-amber-600 dark:text-amber-300">
+                        {formatNumber(prod.commercialUnits)} und
+                      </span>
+                      <div className="text-[10px] text-neutral-500 dark:text-slate-400">
+                        {formatCOP(prod.commercialCOP)}
+                      </div>
+                    </td>
+                    <td className="px-3 py-2.5 text-right font-mono">
+                      <span className="font-bold text-sky-600 dark:text-sky-300">
+                        {formatNumber(prod.qualityUnits)} und
+                      </span>
+                      <div className="text-[10px] text-neutral-500 dark:text-slate-400">
+                        {formatCOP(prod.qualityCOP)}
+                      </div>
+                    </td>
+                    <td className="px-2.5 py-2.5 text-center font-mono font-semibold text-violet-300">
+                      {prod.lechozoUnits > 0 ? `${prod.lechozoUnits} u` : '—'}
+                    </td>
+                    <td className="px-2.5 py-2.5 text-center font-mono font-semibold text-cyan-300">
+                      {prod.vacioUnits > 0 ? `${prod.vacioUnits} u` : '—'}
+                    </td>
+                    <td className="px-3 py-2.5 text-right font-mono">
+                      <div className="font-bold text-neutral-900 dark:text-white">
+                        {formatNumber(prod.totalUnits)} unds
+                      </div>
+                      <div className="text-[10px] text-emerald-400">
+                        {formatCOP(prod.totalCOP)}
+                      </div>
+                    </td>
+                    <td className="py-2.5 pl-3 pr-5 text-[11px] text-neutral-700 dark:text-slate-200">
+                      {actionLabel}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </BentoCard>
 
       {/* Row 2: Main Bento Grid (8 Cols Consolidated Matrix + 4 Cols Cause & Lot Intelligence) */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
