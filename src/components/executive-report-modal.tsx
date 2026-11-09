@@ -294,14 +294,14 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
     };
   }, [zoneMetricsList, filteredRows]);
 
-  // Generador de Impresión / PDF en 1 SOLA HOJA (A4 Horizontal ultra-organizado)
+  // Generador de Impresión / PDF ocupando la hoja completa
   const handlePrintSinglePageReport = () => {
     const logoUrl = `${window.location.origin}/cardiso_logo.png`;
     const activePeriodLabel =
       dateFilter === 'ALL' ? `${minDate} al ${maxDate}` : `Fecha: ${dateFilter}`;
 
     const productsRowsHtml = productAnalytics.escalafonList
-      .slice(0, 15)
+      .slice(0, 22)
       .map((p, idx) => {
         const action =
           p.commercialUnits > p.qualityUnits
@@ -310,7 +310,7 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
             ? 'Control Lechosidad'
             : p.vacioUnits > 0
             ? 'Revisar Vacío'
-            : 'Stock OK';
+            : 'Rotación Óptima';
         return `
           <tr>
             <td style="text-align:center;font-weight:700;color:#475569;">${idx + 1}</td>
@@ -320,14 +320,14 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
             <td style="text-align:center;color:#6d28d9;font-weight:700;">${p.lechozoUnits || '-'}</td>
             <td style="text-align:center;color:#0284c7;font-weight:700;">${p.vacioUnits || '-'}</td>
             <td style="text-align:right;font-weight:800;color:#0f172a;">${p.totalUnits}u · ${formatCompactCOP(p.totalCOP)}</td>
-            <td style="font-size:8.5px;color:#1e293b;">${action}</td>
+            <td style="font-size:9px;color:#1e293b;font-weight:600;">${action}</td>
           </tr>
         `;
       })
       .join('');
 
     const zonesRowsHtml = sortedZones
-      .slice(0, 16)
+      .slice(0, 22)
       .map(
         (z, idx) => `
           <tr>
@@ -343,7 +343,7 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
       )
       .join('');
 
-    const printWindow = window.open('', '_blank', 'width=1200,height=850');
+    const printWindow = window.open('', '_blank', 'width=1280,height=900');
     if (!printWindow) {
       window.print();
       return;
@@ -354,175 +354,192 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
       <html lang="es">
       <head>
         <meta charset="UTF-8" />
-        <title>Informe Ejecutivo Cardiso - ${maxDate}</title>
+        <title>Informe Gerencial Cardiso - ${maxDate}</title>
         <style>
           @page {
             size: A4 landscape;
-            margin: 6mm;
+            margin: 5mm;
           }
           * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
             font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
-          body {
+          html, body {
+            width: 100%;
+            height: 100%;
             background: #ffffff;
             color: #0f172a;
-            font-size: 9.5px;
-            line-height: 1.25;
-            padding: 4px;
+            font-size: 10px;
+            line-height: 1.3;
           }
           .sheet {
             width: 100%;
+            min-height: 98vh;
+            height: 98vh;
             border: 1.5px solid #cbd5e1;
             border-radius: 10px;
-            padding: 10px 12px;
+            padding: 12px 14px;
             background: #ffffff;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
           }
           .header {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            border-bottom: 2px solid #059669;
-            padding-bottom: 6px;
+            border-bottom: 2.5px solid #059669;
+            padding-bottom: 8px;
             margin-bottom: 8px;
           }
           .header-left {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 14px;
           }
           .logo {
-            height: 40px;
+            height: 46px;
             width: auto;
             object-fit: contain;
           }
           .company-tag {
-            font-size: 8.5px;
+            font-size: 9px;
             font-weight: 800;
             color: #059669;
             letter-spacing: 0.08em;
             text-transform: uppercase;
           }
           .report-title {
-            font-size: 14px;
+            font-size: 15px;
             font-weight: 900;
             color: #0f172a;
+            margin-top: 1px;
           }
           .report-sub {
-            font-size: 9px;
+            font-size: 9.5px;
             color: #475569;
+            margin-top: 1px;
           }
           .cutoff-box {
             text-align: right;
             background: #ecfdf5;
-            border: 1px solid #6ee7b7;
+            border: 1.5px solid #6ee7b7;
             border-radius: 8px;
-            padding: 4px 10px;
+            padding: 5px 12px;
           }
           .cutoff-label {
-            font-size: 8px;
-            font-weight: 700;
+            font-size: 8.5px;
+            font-weight: 800;
             text-transform: uppercase;
             color: #047857;
           }
           .cutoff-date {
-            font-size: 13px;
+            font-size: 14px;
             font-weight: 900;
             color: #065f46;
           }
           .kpi-row {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 8px;
+            gap: 10px;
             margin-bottom: 8px;
           }
           .kpi-card {
-            border: 1px solid #e2e8f0;
+            border: 1px solid #cbd5e1;
             border-radius: 8px;
-            padding: 5px 8px;
+            padding: 6px 10px;
             background: #f8fafc;
           }
           .kpi-label {
-            font-size: 8px;
-            font-weight: 700;
+            font-size: 8.5px;
+            font-weight: 800;
             text-transform: uppercase;
-            color: #64748b;
+            color: #475569;
           }
           .kpi-val {
-            font-size: 13px;
+            font-size: 14px;
             font-weight: 900;
             color: #0f172a;
-            margin-top: 1px;
+            margin-top: 2px;
           }
           .kpi-sub {
-            font-size: 8px;
+            font-size: 8.5px;
             color: #475569;
+            margin-top: 1px;
           }
           .insights-row {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 8px;
+            gap: 10px;
             margin-bottom: 8px;
           }
           .insight-box {
             border: 1px solid #cbd5e1;
             border-radius: 8px;
-            padding: 6px 8px;
+            padding: 7px 10px;
             background: #ffffff;
           }
           .insight-title {
-            font-size: 8.5px;
+            font-size: 9px;
             font-weight: 800;
             text-transform: uppercase;
             margin-bottom: 4px;
-            color: #1e293b;
-            border-bottom: 1px solid #f1f5f9;
-            padding-bottom: 2px;
+            color: #0f172a;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 3px;
           }
           .insight-line {
             display: flex;
             justify-content: space-between;
-            font-size: 8.8px;
-            margin-top: 2px;
+            font-size: 9.2px;
+            margin-top: 3px;
           }
           .tables-grid {
+            flex: 1;
             display: grid;
             grid-template-columns: 1.12fr 0.88fr;
             gap: 10px;
+            align-items: stretch;
           }
           .table-card {
             border: 1px solid #cbd5e1;
             border-radius: 8px;
             overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            background: #ffffff;
           }
           .table-header {
             background: #0f172a;
             color: #ffffff;
-            padding: 4px 8px;
-            font-size: 9px;
+            padding: 5px 10px;
+            font-size: 9.5px;
             font-weight: 800;
             display: flex;
             justify-content: space-between;
           }
           table {
             width: 100%;
+            height: 100%;
             border-collapse: collapse;
-            font-size: 8.4px;
+            font-size: 8.8px;
           }
           th {
             background: #f1f5f9;
-            color: #334155;
+            color: #1e293b;
             text-transform: uppercase;
-            font-size: 7.5px;
+            font-size: 8px;
             font-weight: 800;
-            padding: 3px 4px;
+            padding: 4px 5px;
             border-bottom: 1px solid #cbd5e1;
             text-align: left;
           }
           td {
-            padding: 2.4px 4px;
+            padding: 3.5px 5px;
             border-bottom: 1px solid #f1f5f9;
             white-space: nowrap;
           }
@@ -530,90 +547,93 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
             background: #f8fafc;
           }
           .footer {
-            margin-top: 6px;
-            padding-top: 4px;
-            border-top: 1px dashed #cbd5e1;
+            margin-top: 8px;
+            padding-top: 6px;
+            border-top: 1.5px solid #cbd5e1;
             display: flex;
             justify-content: space-between;
-            font-size: 8px;
-            color: #64748b;
+            font-size: 8.8px;
+            color: #475569;
+            font-weight: 600;
           }
         </style>
       </head>
       <body>
         <div class="sheet">
-          <div class="header">
-            <div class="header-left">
-              <img src="${logoUrl}" class="logo" alt="Cardiso Logo" />
-              <div>
-                <div class="company-tag">CARDISO S.A.S. · ALIMENTOS CARLA — INFORME EJECUTIVO EN 1 HOJA</div>
-                <div class="report-title">RESUMEN GERENCIAL DE VENTAS, CALIDAD E INVENTARIOS</div>
-                <div class="report-sub">Administrador General: <strong>${currentUser.name}</strong> · Periodo auditado: <strong>${activePeriodLabel}</strong> (${filteredRows.length} registros)</div>
+          <div>
+            <div class="header">
+              <div class="header-left">
+                <img src="${logoUrl}" class="logo" alt="Cardiso Logo" />
+                <div>
+                  <div class="company-tag">CARDISO S.A.S. · ALIMENTOS CARLA — DIRECCIÓN GENERAL Y CONTROL DE CALIDAD</div>
+                  <div class="report-title">INFORME GERENCIAL DE VENTAS, CALIDAD E INVENTARIOS</div>
+                  <div class="report-sub">Administrador General: <strong>${currentUser.name}</strong> · Periodo auditado: <strong>${activePeriodLabel}</strong> (${filteredRows.length} registros procesados)</div>
+                </div>
               </div>
-            </div>
-            <div class="cutoff-box">
-              <div class="cutoff-label">Cambios actualizados hasta</div>
-              <div class="cutoff-date">${maxDate}</div>
-            </div>
-          </div>
-
-          <div class="kpi-row">
-            <div class="kpi-card">
-              <div class="kpi-label">1. Ventas Totales Mes</div>
-              <div class="kpi-val" style="color:#047857;">${formatCOP(globalTotals.totalSales)}</div>
-              <div class="kpi-sub">Incidencia global: ${formatPercent(globalTotals.pctOverSales)}</div>
-            </div>
-            <div class="kpi-card">
-              <div class="kpi-label">2. Total Devoluciones</div>
-              <div class="kpi-val">${formatCOP(globalTotals.totalCOP)}</div>
-              <div class="kpi-sub">${formatNumber(globalTotals.totalUnits)} unidades totales</div>
-            </div>
-            <div class="kpi-card">
-              <div class="kpi-label">3. Devolución Comercial (Ruta)</div>
-              <div class="kpi-val" style="color:#b45309;">${formatCOP(globalTotals.commCOP)}</div>
-              <div class="kpi-sub">${formatNumber(globalTotals.commUnits)} unds (Bajar Inventario)</div>
-            </div>
-            <div class="kpi-card">
-              <div class="kpi-label">4. Devolución Calidad (Planta)</div>
-              <div class="kpi-val" style="color:#0369a1;">${formatCOP(globalTotals.qualCOP)}</div>
-              <div class="kpi-sub">Lechoso: ${globalTotals.lechozoUnits}u · Vacío: ${globalTotals.vacioUnits}u</div>
-            </div>
-          </div>
-
-          <div class="insights-row">
-            <div class="insight-box">
-              <div class="insight-title">🏆 Desempeño de Ventas por Zona</div>
-              <div class="insight-line">
-                <span><strong>Más Vende:</strong> ${topSellingZone ? topSellingZone.consolidatedName : 'N/A'}</span>
-                <strong style="color:#047857;">${topSellingZone ? formatCompactCOP(topSellingZone.monthlySalesCOP) : '$0'}</strong>
-              </div>
-              <div class="insight-line">
-                <span><strong>Menos Vende:</strong> ${lowestSellingZone ? lowestSellingZone.consolidatedName : 'N/A'}</span>
-                <strong style="color:#b45309;">${lowestSellingZone ? formatCompactCOP(lowestSellingZone.monthlySalesCOP) : '$0'}</strong>
+              <div class="cutoff-box">
+                <div class="cutoff-label">Cambios actualizados hasta</div>
+                <div class="cutoff-date">${maxDate}</div>
               </div>
             </div>
 
-            <div class="insight-box">
-              <div class="insight-title">🔬 Productos Críticos en Planta</div>
-              <div class="insight-line">
-                <span><strong>Más Lechosidad:</strong> ${productAnalytics.topLechozo ? productAnalytics.topLechozo.productName : 'N/A'}</span>
-                <strong style="color:#6d28d9;">${productAnalytics.topLechozo ? `${productAnalytics.topLechozo.lechozoUnits}u (${formatCompactCOP(productAnalytics.topLechozo.lechozoCOP)})` : '0u'}</strong>
+            <div class="kpi-row">
+              <div class="kpi-card">
+                <div class="kpi-label">1. Ventas Totales Mes</div>
+                <div class="kpi-val" style="color:#047857;">${formatCOP(globalTotals.totalSales)}</div>
+                <div class="kpi-sub">Incidencia global: ${formatPercent(globalTotals.pctOverSales)}</div>
               </div>
-              <div class="insight-line">
-                <span><strong>Más Vacío:</strong> ${productAnalytics.topVacio ? productAnalytics.topVacio.productName : 'N/A'}</span>
-                <strong style="color:#0284c7;">${productAnalytics.topVacio ? `${productAnalytics.topVacio.vacioUnits}u (${formatCompactCOP(productAnalytics.topVacio.vacioCOP)})` : '0u'}</strong>
+              <div class="kpi-card">
+                <div class="kpi-label">2. Total Devoluciones</div>
+                <div class="kpi-val">${formatCOP(globalTotals.totalCOP)}</div>
+                <div class="kpi-sub">${formatNumber(globalTotals.totalUnits)} unidades totales</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-label">3. Devolución Comercial (Ruta)</div>
+                <div class="kpi-val" style="color:#b45309;">${formatCOP(globalTotals.commCOP)}</div>
+                <div class="kpi-sub">${formatNumber(globalTotals.commUnits)} unds (Bajar Inventario)</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-label">4. Devolución Calidad (Planta)</div>
+                <div class="kpi-val" style="color:#0369a1;">${formatCOP(globalTotals.qualCOP)}</div>
+                <div class="kpi-sub">Lechoso: ${globalTotals.lechozoUnits}u · Vacío: ${globalTotals.vacioUnits}u</div>
               </div>
             </div>
 
-            <div class="insight-box">
-              <div class="insight-title">📦 Control de Inventario Comercial</div>
-              <div class="insight-line">
-                <span><strong>Bajar Pedido:</strong> ${productAnalytics.topCommercial ? productAnalytics.topCommercial.productName : 'N/A'}</span>
-                <strong style="color:#b45309;">${productAnalytics.topCommercial ? `${productAnalytics.topCommercial.commercialUnits}u` : '0u'}</strong>
+            <div class="insights-row">
+              <div class="insight-box">
+                <div class="insight-title">🏆 Desempeño de Ventas por Zona</div>
+                <div class="insight-line">
+                  <span><strong>Más Vende:</strong> ${topSellingZone ? topSellingZone.consolidatedName : 'N/A'}</span>
+                  <strong style="color:#047857;">${topSellingZone ? formatCompactCOP(topSellingZone.monthlySalesCOP) : '$0'}</strong>
+                </div>
+                <div class="insight-line">
+                  <span><strong>Menos Vende:</strong> ${lowestSellingZone ? lowestSellingZone.consolidatedName : 'N/A'}</span>
+                  <strong style="color:#b45309;">${lowestSellingZone ? formatCompactCOP(lowestSellingZone.monthlySalesCOP) : '$0'}</strong>
+                </div>
               </div>
-              <div class="insight-line">
-                <span><strong>Mejor Rotación:</strong> ${productAnalytics.leastReturnedProduct ? productAnalytics.leastReturnedProduct.productName : 'N/A'}</span>
-                <strong style="color:#047857;">Solo ${productAnalytics.leastReturnedProduct ? `${productAnalytics.leastReturnedProduct.totalUnits}u` : '0u'}</strong>
+
+              <div class="insight-box">
+                <div class="insight-title">🔬 Productos Críticos en Planta</div>
+                <div class="insight-line">
+                  <span><strong>Más Lechosidad:</strong> ${productAnalytics.topLechozo ? productAnalytics.topLechozo.productName : 'N/A'}</span>
+                  <strong style="color:#6d28d9;">${productAnalytics.topLechozo ? `${productAnalytics.topLechozo.lechozoUnits}u (${formatCompactCOP(productAnalytics.topLechozo.lechozoCOP)})` : '0u'}</strong>
+                </div>
+                <div class="insight-line">
+                  <span><strong>Más Vacío:</strong> ${productAnalytics.topVacio ? productAnalytics.topVacio.productName : 'N/A'}</span>
+                  <strong style="color:#0284c7;">${productAnalytics.topVacio ? `${productAnalytics.topVacio.vacioUnits}u (${formatCompactCOP(productAnalytics.topVacio.vacioCOP)})` : '0u'}</strong>
+                </div>
+              </div>
+
+              <div class="insight-box">
+                <div class="insight-title">📦 Control de Inventario Comercial</div>
+                <div class="insight-line">
+                  <span><strong>Bajar Pedido:</strong> ${productAnalytics.topCommercial ? productAnalytics.topCommercial.productName : 'N/A'}</span>
+                  <strong style="color:#b45309;">${productAnalytics.topCommercial ? `${productAnalytics.topCommercial.commercialUnits}u` : '0u'}</strong>
+                </div>
+                <div class="insight-line">
+                  <span><strong>Mejor Rotación:</strong> ${productAnalytics.leastReturnedProduct ? productAnalytics.leastReturnedProduct.productName : 'N/A'}</span>
+                  <strong style="color:#047857;">Solo ${productAnalytics.leastReturnedProduct ? `${productAnalytics.leastReturnedProduct.totalUnits}u` : '0u'}</strong>
+                </div>
               </div>
             </div>
           </div>
@@ -622,7 +642,7 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
             <div class="table-card">
               <div class="table-header">
                 <span>ESCALAFÓN DE PRODUCTOS (${productSortOrder === 'ASC' ? 'DE MENOR A MAYOR ↑' : 'DE MAYOR A MENOR ↓'}) — CALIDAD Y COMERCIAL</span>
-                <span>Top ${Math.min(15, productAnalytics.escalafonList.length)} de ${productAnalytics.escalafonList.length} ref.</span>
+                <span>${productAnalytics.escalafonList.length} referencias analizadas</span>
               </div>
               <table>
                 <thead>
@@ -646,7 +666,7 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
             <div class="table-card">
               <div class="table-header">
                 <span>ESCALAFÓN DE ZONAS Y VENDEDORES OFICIALES</span>
-                <span>14 Vendedores + Z14/PDV</span>
+                <span>14 Vendedores + Z14 y Puntos de Venta</span>
               </div>
               <table>
                 <thead>
@@ -668,7 +688,7 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
           </div>
 
           <div class="footer">
-            <span>Generado por RetornaOS Enterprise · Cardiso S.A.S. (Alimentos Carla)</span>
+            <span>CARDISO S.A.S. · ALIMENTOS CARLA — Sistema Oficial de Control de Devoluciones y Trazabilidad</span>
             <span>Firma Autorizada: <strong>${currentUser.name} (Administrador General)</strong> · Fecha de corte: ${maxDate}</span>
           </div>
         </div>
@@ -736,7 +756,7 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
     <Modal
       open={open}
       onClose={onClose}
-      title="Hoja Única Ejecutiva — Informe Gerencial Compacto (1 Sola Página)"
+      title="Informe Ejecutivo Gerencial — Control de Ventas, Calidad e Inventarios"
       subtitle={`Administrador: ${currentUser.name} · Cambios actualizados hasta el día: ${maxDate}`}
       maxWidthClass="max-w-7xl"
     >
@@ -791,13 +811,13 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
               className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 px-4 py-1.5 text-xs font-bold text-white shadow-lg shadow-emerald-600/25 transition-all"
             >
               <Printer className="h-3.5 w-3.5" />
-              Imprimir / PDF en 1 Sola Hoja
+              Imprimir / Guardar PDF Oficial
             </button>
           </div>
         </div>
 
         {/* ===================================================================== */}
-        {/* HOJA ÚNICA EJECUTIVA COMPACTA (TODO EN UNA SOLA VISTA SIN DESORDEN)   */}
+        {/* VISTA EJECUTIVA COMPACTA                                              */}
         {/* ===================================================================== */}
         <div className="rounded-2xl border border-white/20 bg-slate-950/95 p-4 shadow-2xl space-y-3.5">
           {/* Encabezado Compacto con Logo + 4 KPIs en la misma franja */}
@@ -814,11 +834,11 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
                     CARDISO S.A.S. · ALIMENTOS CARLA
                   </span>
                   <Badge variant="success" dot>
-                    Formato Hoja Única
+                    Reporte Oficial de Auditoría
                   </Badge>
                 </div>
                 <h2 className="text-sm sm:text-base font-extrabold text-white">
-                  INFORME EJECUTIVO DE VENTAS, CALIDAD E INVENTARIOS
+                  INFORME GERENCIAL DE VENTAS, CALIDAD E INVENTARIOS
                 </h2>
                 <p className="text-[11px] text-slate-300">
                   Generado por: <strong>Sebastián (Administrador General)</strong> · Cambios hasta:{' '}
@@ -1115,11 +1135,11 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
             </div>
           </div>
 
-          {/* Pie de Firma en Hoja Única */}
+          {/* Pie de Firma Oficial */}
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-white/10 pt-2.5 text-[11px] text-slate-400">
             <span className="flex items-center gap-1.5 text-emerald-300 font-medium">
               <FileCheck2 className="h-3.5 w-3.5" />
-              Al pulsar &ldquo;Imprimir / PDF en 1 Sola Hoja&rdquo;, el sistema genera automáticamente la planilla corporativa en formato A4 Horizontal de 1 página.
+              CARDISO S.A.S. · ALIMENTOS CARLA — Documento Oficial de Control y Trazabilidad
             </span>
             <span>
               Responsable Administrativo: <strong className="text-white">Sebastián</strong>
