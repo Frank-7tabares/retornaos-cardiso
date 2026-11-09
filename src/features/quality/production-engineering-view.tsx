@@ -69,6 +69,7 @@ export const ProductionEngineeringView: React.FC<
   const [causeFilter, setCauseFilter] = useState<'ALL' | 'CALIDAD' | ReturnCauseKey>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'MATRIX' | 'DETAIL'>('MATRIX');
+  const [chartBarMode, setChartBarMode] = useState<'LOTS' | 'DATES'>('LOTS');
 
   // Unique dates present in returnRows
   const uniqueDates = useMemo(() => {
@@ -155,6 +156,8 @@ export const ProductionEngineeringView: React.FC<
         acc.xFechaUnits += r.causes.xFecha;
         acc.abombaUnits += r.causes.abomba;
         acc.proxVencerUnits += r.causes.proxVencer;
+        acc.vencidoUnits += r.causes.vencido;
+        acc.aCobrarUnits += r.causes.aCobrar;
         return acc;
       },
       {
@@ -167,9 +170,120 @@ export const ProductionEngineeringView: React.FC<
         xFechaUnits: 0,
         abombaUnits: 0,
         proxVencerUnits: 0,
+        vencidoUnits: 0,
+        aCobrarUnits: 0,
       }
     );
   }, [filteredRows]);
+
+  // Datos para las Gráficas de Ingeniería de Producción (Causas, Lotes y Fechas)
+  const engineeringChartsData = useMemo(() => {
+    const causesList = [
+      {
+        key: 'lechozo' as ReturnCauseKey,
+        label: 'Lechosidad (Planta)',
+        units: globalMetrics.lechozoUnits,
+        colorHex: '#8b5cf6',
+        barClass: 'bg-violet-500',
+        textClass: 'text-violet-300',
+      },
+      {
+        key: 'vacio' as ReturnCauseKey,
+        label: 'Pérdida de Vacío (Planta)',
+        units: globalMetrics.vacioUnits,
+        colorHex: '#0ea5e9',
+        barClass: 'bg-sky-500',
+        textClass: 'text-sky-300',
+      },
+      {
+        key: 'proxVencer' as ReturnCauseKey,
+        label: 'Próx. a Vencer (Comercial)',
+        units: globalMetrics.proxVencerUnits,
+        colorHex: '#f59e0b',
+        barClass: 'bg-amber-500',
+        textClass: 'text-amber-300',
+      },
+      {
+        key: 'xFecha' as ReturnCauseKey,
+        label: 'Por Fecha / Abombamiento',
+        units: globalMetrics.xFechaUnits + globalMetrics.abombaUnits,
+        colorHex: '#06b6d4',
+        barClass: 'bg-cyan-500',
+        textClass: 'text-cyan-300',
+      },
+      {
+        key: 'aCobrar' as ReturnCauseKey,
+        label: 'A Cobrar / Vencido',
+        units: globalMetrics.aCobrarUnits + globalMetrics.vencidoUnits,
+        colorHex: '#f43f5e',
+        barClass: 'bg-rose-500',
+        textClass: 'text-rose-300',
+      },
+    ];
+
+    const totalCauseUnits = Math.max(
+      1,
+      causesList.reduce((acc, c) => acc + c.units, 0)
+    );
+
+    // Top 7 Lotes para gráfica de columnas
+    const lotMap = new Map<
+      string,
+      { lot: string; qualityUnits: number; commercialUnits: number; totalUnits: number }
+    >();
+    // Fechas para gráfica de evolución temporal
+    const dateMap = new Map<
+      string,
+      { date: string; qualityUnits: number; commercialUnits: number; totalUnits: number }
+    >();
+
+    for (const r of filteredRows) {
+      const qU =
+        r.causes.lechozo + r.causes.vacio + r.causes.xFecha + r.causes.abomba;
+      const cU = r.causes.aCobrar + r.causes.proxVencer + r.causes.vencido;
+
+      if (r.lotNumber && r.lotNumber !== 'S/L') {
+        const prevLot = lotMap.get(r.lotNumber) || {
+          lot: r.lotNumber,
+          qualityUnits: 0,
+          commercialUnits: 0,
+          totalUnits: 0,
+        };
+        prevLot.qualityUnits += qU;
+        prevLot.commercialUnits += cU;
+        prevLot.totalUnits += r.qtyToReceive;
+        lotMap.set(r.lotNumber, prevLot);
+      }
+
+      if (r.date) {
+        const prevDate = dateMap.get(r.date) || {
+          date: r.date,
+          qualityUnits: 0,
+          commercialUnits: 0,
+          totalUnits: 0,
+        };
+        prevDate.qualityUnits += qU;
+        prevDate.commercialUnits += cU;
+        prevDate.totalUnits += r.qtyToReceive;
+        dateMap.set(r.date, prevDate);
+      }
+    }
+
+    const topLotsChart = Array.from(lotMap.values())
+      .sort((a, b) => b.totalUnits - a.totalUnits)
+      .slice(0, 8);
+
+    const timelineChart = Array.from(dateMap.values())
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(-8);
+
+    return {
+      causesList,
+      totalCauseUnits,
+      topLotsChart,
+      timelineChart,
+    };
+  }, [filteredRows, globalMetrics]);
 
   // Consolidate Product vs Cause & Lots Matrix
   const productMatrix = useMemo<ProductQualitySummary[]>(() => {
@@ -574,6 +688,461 @@ export const ProductionEngineeringView: React.FC<
                 </p>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* PANEL DE GRÁFICAS ANALÍTICAS DE INGENIERÍA DE PRODUCCIÓN Y CALIDAD    */}
+      {/* ===================================================================== */}
+      {filteredRows.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+          {/* Gráfica 1 (4 Cols): Anillo SVG + Distribución por Causa en Planta */}
+          <div className="lg:col-span-4 rounded-3xl border border-white/15 bg-slate-950/90 backdrop-blur-2xl p-5 shadow-xl flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <div>
+                  <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
+                    <BarChart3 className="h-4 w-4 text-violet-400" />
+                    1. Gráfica de Distribución por Causa
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Haz clic en una barra para filtrar esa causal
+                  </p>
+                </div>
+                <Badge variant="quality">
+                  {formatNumber(globalMetrics.totalUnits)} unds
+                </Badge>
+              </div>
+
+              {/* Donut SVG + Resumen Central */}
+              <div className="flex items-center gap-4 my-3 p-3 rounded-2xl border border-white/10 bg-slate-900/70">
+                <div className="relative h-24 w-24 shrink-0 flex items-center justify-center">
+                  <svg viewBox="0 0 36 36" className="h-24 w-24 -rotate-90">
+                    <circle
+                      cx="18"
+                      cy="18"
+                      r="14"
+                      fill="transparent"
+                      stroke="#1e293b"
+                      strokeWidth="4.5"
+                    />
+                    {(() => {
+                      let accumulatedPct = 0;
+                      const circumference = 2 * Math.PI * 14;
+                      return engineeringChartsData.causesList.map((c) => {
+                        const pct =
+                          (c.units / engineeringChartsData.totalCauseUnits) *
+                          100;
+                        if (pct <= 0) return null;
+                        const strokeDasharray = `${
+                          (pct / 100) * circumference
+                        } ${circumference}`;
+                        const strokeDashoffset = -(
+                          (accumulatedPct / 100) *
+                          circumference
+                        );
+                        accumulatedPct += pct;
+                        return (
+                          <circle
+                            key={c.key}
+                            cx="18"
+                            cy="18"
+                            r="14"
+                            fill="transparent"
+                            stroke={c.colorHex}
+                            strokeWidth="4.5"
+                            strokeDasharray={strokeDasharray}
+                            strokeDashoffset={strokeDashoffset}
+                          />
+                        );
+                      });
+                    })()}
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                    <span className="font-mono text-xs font-extrabold text-white">
+                      {globalMetrics.totalUnits > 0
+                        ? Math.round(
+                            ((globalMetrics.lechozoUnits +
+                              globalMetrics.vacioUnits +
+                              globalMetrics.xFechaUnits +
+                              globalMetrics.abombaUnits) /
+                              globalMetrics.totalUnits) *
+                              100
+                          )
+                        : 0}
+                      %
+                    </span>
+                    <span className="text-[9px] uppercase text-sky-300 font-bold">
+                      Planta
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 text-xs flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <span className="text-violet-300 font-semibold">
+                      🟣 Lechosidad:
+                    </span>
+                    <span className="font-mono font-bold text-white">
+                      {formatNumber(globalMetrics.lechozoUnits)} u
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sky-300 font-semibold">
+                      🔵 Vacío:
+                    </span>
+                    <span className="font-mono font-bold text-white">
+                      {formatNumber(globalMetrics.vacioUnits)} u
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-amber-300 font-semibold">
+                      🟠 Comercial:
+                    </span>
+                    <span className="font-mono font-bold text-white">
+                      {formatNumber(
+                        globalMetrics.proxVencerUnits +
+                          globalMetrics.aCobrarUnits +
+                          globalMetrics.vencidoUnits
+                      )}{' '}
+                      u
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Barras horizontales por cada causa */}
+              <div className="space-y-2 mt-3">
+                {engineeringChartsData.causesList.map((c) => {
+                  const pct =
+                    (c.units / engineeringChartsData.totalCauseUnits) * 100;
+                  const active = causeFilter === c.key;
+                  return (
+                    <button
+                      key={c.key}
+                      type="button"
+                      onClick={() =>
+                        setCauseFilter(active ? 'ALL' : c.key)
+                      }
+                      className={`w-full text-left rounded-xl p-2 border transition-all ${
+                        active
+                          ? 'border-white/40 bg-white/10'
+                          : 'border-white/5 bg-slate-900/50 hover:bg-slate-900'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between text-[11px] mb-1">
+                        <span className={`font-semibold ${c.textClass}`}>
+                          {c.label}
+                        </span>
+                        <span className="font-mono text-white font-bold">
+                          {formatNumber(c.units)} u ({formatPercent(pct, 1)})
+                        </span>
+                      </div>
+                      <div className="h-2 w-full rounded-full bg-slate-800 overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${c.barClass} transition-all duration-500`}
+                          style={{ width: `${Math.max(pct, c.units > 0 ? 3 : 0)}%` }}
+                        />
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Gráfica 2 (4 Cols): Barras Apiladas Top Productos (Lechosidad / Vacío / Comercial) */}
+          <div className="lg:col-span-4 rounded-3xl border border-white/15 bg-slate-950/90 backdrop-blur-2xl p-5 shadow-xl flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <div>
+                  <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
+                    <Package className="h-4 w-4 text-sky-400" />
+                    2. Gráfica Top Productos (Calidad vs. Ruta)
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Comparativa visual de Lechosidad, Vacío y Comercial
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 text-[10px]">
+                  <span className="inline-flex items-center gap-1 text-violet-300">
+                    <span className="h-2 w-2 rounded-full bg-violet-500" />
+                    Lech.
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-sky-300">
+                    <span className="h-2 w-2 rounded-full bg-sky-500" />
+                    Vacío
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-amber-300">
+                    <span className="h-2 w-2 rounded-full bg-amber-500" />
+                    Com.
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-2.5 mt-2">
+                {(() => {
+                  const topProds = productMatrix.slice(0, 7);
+                  const maxProdUnits = Math.max(
+                    1,
+                    ...topProds.map((p) => p.totalUnits)
+                  );
+                  return topProds.map((p) => {
+                    const lechPct = (p.causes.lechozo / maxProdUnits) * 100;
+                    const vacPct =
+                      ((p.causes.vacio + p.causes.xFecha + p.causes.abomba) /
+                        maxProdUnits) *
+                      100;
+                    const commPct = (p.commercialUnits / maxProdUnits) * 100;
+                    const isSelected = selectedProductFilter === p.productName;
+
+                    return (
+                      <div
+                        key={p.productName}
+                        onClick={() =>
+                          setSelectedProductFilter(
+                            isSelected ? 'ALL' : p.productName
+                          )
+                        }
+                        className={`cursor-pointer rounded-xl p-2 border transition-all ${
+                          isSelected
+                            ? 'border-emerald-400 bg-emerald-950/30'
+                            : 'border-white/5 bg-slate-900/60 hover:border-white/20'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between text-[11px] mb-1">
+                          <span className="font-semibold text-white truncate max-w-[180px]">
+                            {p.productName}
+                          </span>
+                          <span className="font-mono text-[11px] font-bold text-slate-200 shrink-0 ml-2">
+                            {p.totalUnits} u · {formatCOP(p.totalCOP)}
+                          </span>
+                        </div>
+                        <div className="h-2.5 w-full rounded-full bg-slate-800 overflow-hidden flex">
+                          {p.causes.lechozo > 0 && (
+                            <div
+                              title={`Lechosidad: ${p.causes.lechozo}u`}
+                              className="h-full bg-violet-500"
+                              style={{ width: `${Math.max(lechPct, 3)}%` }}
+                            />
+                          )}
+                          {p.causes.vacio + p.causes.xFecha + p.causes.abomba >
+                            0 && (
+                            <div
+                              title={`Vacío / Fecha: ${
+                                p.causes.vacio +
+                                p.causes.xFecha +
+                                p.causes.abomba
+                              }u`}
+                              className="h-full bg-sky-500"
+                              style={{ width: `${Math.max(vacPct, 3)}%` }}
+                            />
+                          )}
+                          {p.commercialUnits > 0 && (
+                            <div
+                              title={`Comercial: ${p.commercialUnits}u`}
+                              className="h-full bg-amber-500"
+                              style={{ width: `${Math.max(commPct, 3)}%` }}
+                            />
+                          )}
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            </div>
+          </div>
+
+          {/* Gráfica 3 (4 Cols): Columnas Verticales por Lotes Críticos o Evolución por Fecha */}
+          <div className="lg:col-span-4 rounded-3xl border border-white/15 bg-slate-950/90 backdrop-blur-2xl p-5 shadow-xl flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <div>
+                  <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
+                    <Tag className="h-4 w-4 text-emerald-400" />
+                    3. Gráfica por {chartBarMode === 'LOTS' ? 'Lotes Críticos' : 'Fecha de Registro'}
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Haz clic en cualquier columna para filtrar
+                  </p>
+                </div>
+
+                <div className="inline-flex rounded-xl border border-white/15 bg-slate-900 p-0.5 text-[10px]">
+                  <button
+                    type="button"
+                    onClick={() => setChartBarMode('LOTS')}
+                    className={`rounded-lg px-2 py-1 font-bold transition-all ${
+                      chartBarMode === 'LOTS'
+                        ? 'bg-emerald-600 text-white'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Por Lotes
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setChartBarMode('DATES')}
+                    className={`rounded-lg px-2 py-1 font-bold transition-all ${
+                      chartBarMode === 'DATES'
+                        ? 'bg-indigo-600 text-white'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Por Fechas
+                  </button>
+                </div>
+              </div>
+
+              {/* Columnas Verticales Interactivas */}
+              <div className="mt-4 h-56 flex items-end justify-between gap-2 pt-6 pb-2 px-2 rounded-2xl border border-white/10 bg-slate-900/60">
+                {chartBarMode === 'LOTS' ? (
+                  engineeringChartsData.topLotsChart.length > 0 ? (
+                    (() => {
+                      const maxLotU = Math.max(
+                        1,
+                        ...engineeringChartsData.topLotsChart.map(
+                          (l) => l.totalUnits
+                        )
+                      );
+                      return engineeringChartsData.topLotsChart.map((item) => {
+                        const heightPct = Math.max(
+                          12,
+                          Math.round((item.totalUnits / maxLotU) * 100)
+                        );
+                        const qualRatio =
+                          item.totalUnits > 0
+                            ? Math.round(
+                                (item.qualityUnits / item.totalUnits) * 100
+                              )
+                            : 0;
+                        const active = selectedLotFilter === item.lot;
+                        return (
+                          <button
+                            key={item.lot}
+                            type="button"
+                            onClick={() =>
+                              setSelectedLotFilter(active ? 'ALL' : item.lot)
+                            }
+                            className="flex-1 flex flex-col items-center h-full justify-end group"
+                            title={`Lote #${item.lot}: ${item.totalUnits} unds (${item.qualityUnits}u Calidad / ${item.commercialUnits}u Comercial)`}
+                          >
+                            <span className="font-mono text-[10px] font-bold text-slate-300 mb-1 group-hover:text-emerald-300">
+                              {item.totalUnits}u
+                            </span>
+                            <div
+                              className={`w-full max-w-[34px] rounded-t-xl overflow-hidden flex flex-col justify-end transition-all ${
+                                active
+                                  ? 'ring-2 ring-emerald-400 shadow-lg shadow-emerald-500/30'
+                                  : 'opacity-90 group-hover:opacity-100'
+                              }`}
+                              style={{ height: `${heightPct}%` }}
+                            >
+                              <div
+                                className="w-full bg-amber-500"
+                                style={{ height: `${100 - qualRatio}%` }}
+                              />
+                              <div
+                                className="w-full bg-violet-500"
+                                style={{ height: `${qualRatio}%` }}
+                              />
+                            </div>
+                            <span
+                              className={`mt-1.5 font-mono text-[10px] font-bold truncate max-w-full ${
+                                active ? 'text-emerald-300' : 'text-slate-400'
+                              }`}
+                            >
+                              L-{item.lot}
+                            </span>
+                          </button>
+                        );
+                      });
+                    })()
+                  ) : (
+                    <div className="w-full text-center text-xs text-slate-400 self-center">
+                      Sin lotes para mostrar
+                    </div>
+                  )
+                ) : engineeringChartsData.timelineChart.length > 0 ? (
+                  (() => {
+                    const maxDateU = Math.max(
+                      1,
+                      ...engineeringChartsData.timelineChart.map(
+                        (d) => d.totalUnits
+                      )
+                    );
+                    return engineeringChartsData.timelineChart.map((item) => {
+                      const heightPct = Math.max(
+                        12,
+                        Math.round((item.totalUnits / maxDateU) * 100)
+                      );
+                      const qualRatio =
+                        item.totalUnits > 0
+                          ? Math.round(
+                              (item.qualityUnits / item.totalUnits) * 100
+                            )
+                          : 0;
+                      const active = selectedDateFilter === item.date;
+                      return (
+                        <button
+                          key={item.date}
+                          type="button"
+                          onClick={() =>
+                            setSelectedDateFilter(active ? 'ALL' : item.date)
+                          }
+                          className="flex-1 flex flex-col items-center h-full justify-end group"
+                          title={`Fecha ${item.date}: ${item.totalUnits} unds (${item.qualityUnits}u Calidad / ${item.commercialUnits}u Comercial)`}
+                        >
+                          <span className="font-mono text-[10px] font-bold text-slate-300 mb-1 group-hover:text-indigo-300">
+                            {item.totalUnits}u
+                          </span>
+                          <div
+                            className={`w-full max-w-[34px] rounded-t-xl overflow-hidden flex flex-col justify-end transition-all ${
+                              active
+                                ? 'ring-2 ring-indigo-400 shadow-lg shadow-indigo-500/30'
+                                : 'opacity-90 group-hover:opacity-100'
+                            }`}
+                            style={{ height: `${heightPct}%` }}
+                          >
+                            <div
+                              className="w-full bg-amber-500"
+                              style={{ height: `${100 - qualRatio}%` }}
+                            />
+                            <div
+                              className="w-full bg-sky-500"
+                              style={{ height: `${qualRatio}%` }}
+                            />
+                          </div>
+                          <span
+                            className={`mt-1.5 font-mono text-[9px] font-bold truncate max-w-full ${
+                              active ? 'text-indigo-300' : 'text-slate-400'
+                            }`}
+                          >
+                            {item.date.slice(5)}
+                          </span>
+                        </button>
+                      );
+                    });
+                  })()
+                ) : (
+                  <div className="w-full text-center text-xs text-slate-400 self-center">
+                    Sin fechas para mostrar
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-2.5 flex items-center justify-between text-[11px] text-slate-400">
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-sm bg-violet-500 inline-block" />
+                  Defectos Planta (Calidad)
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-sm bg-amber-500 inline-block" />
+                  Rotación Comercial
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       )}
