@@ -300,21 +300,18 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
     const activePeriodLabel =
       dateFilter === 'ALL' ? `${minDate} al ${maxDate}` : `Fecha: ${dateFilter}`;
 
-    const ROW_COUNT = Math.min(
-      18,
-      Math.max(productAnalytics.escalafonList.length, sortedZones.length)
-    );
+    const ROW_COUNT = Math.max(22, sortedZones.length);
 
     const productsRowsHtml = productAnalytics.escalafonList
       .slice(0, ROW_COUNT)
       .map((p, idx) => {
         const action =
           p.commercialUnits > p.qualityUnits
-            ? 'Bajar stock en ruta'
+            ? 'Bajar stock ruta'
             : p.lechozoUnits >= p.vacioUnits && p.lechozoUnits > 0
-            ? 'Controlar Lechosidad'
+            ? 'Control Lechosidad'
             : p.vacioUnits > 0
-            ? 'Auditar Sellado Vacío'
+            ? 'Auditar Vacío'
             : 'Rotación Óptima';
         return `
           <tr>
@@ -325,7 +322,7 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
             <td style="text-align:center;color:#6d28d9;font-weight:800;">${p.lechozoUnits || '-'}</td>
             <td style="text-align:center;color:#0284c7;font-weight:800;">${p.vacioUnits || '-'}</td>
             <td style="text-align:right;font-weight:900;color:#0f172a;">${p.totalUnits}u · ${formatCompactCOP(p.totalCOP)}</td>
-            <td style="font-size:9.5px;color:#0f172a;font-weight:700;">${action}</td>
+            <td style="font-size:8.2px;color:#0f172a;font-weight:700;">${action}</td>
           </tr>
         `;
       })
@@ -381,15 +378,19 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
             overflow: hidden;
           }
           .sheet {
-            width: 100vw;
-            height: 100vh;
+            width: 100%;
+            max-width: 100%;
+            height: 95vh;
+            max-height: 95vh;
             border: 2px solid #94a3b8;
             border-radius: 10px;
-            padding: 10px 14px;
+            padding: 7px 10px;
             background: #ffffff;
             display: grid;
             grid-template-rows: auto auto auto 1fr auto;
-            gap: 8px;
+            gap: 5px;
+            page-break-inside: avoid;
+            break-inside: avoid;
           }
           .header {
             display: flex;
@@ -503,10 +504,11 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
           }
           .tables-grid {
             display: grid;
-            grid-template-columns: 1.14fr 0.86fr;
-            gap: 10px;
+            grid-template-columns: 1.03fr 0.97fr;
+            gap: 8px;
             height: 100%;
             min-height: 0;
+            width: 100%;
           }
           .table-card {
             border: 1.5px solid #94a3b8;
@@ -515,13 +517,14 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
             display: grid;
             grid-template-rows: auto 1fr;
             height: 100%;
+            width: 100%;
             background: #ffffff;
           }
           .table-header {
             background: #0f172a;
             color: #ffffff;
-            padding: 6px 10px;
-            font-size: 10px;
+            padding: 5px 8px;
+            font-size: 9px;
             font-weight: 800;
             display: flex;
             justify-content: space-between;
@@ -531,25 +534,31 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
             width: 100%;
             height: 100%;
             border-collapse: collapse;
-            font-size: 9.5px;
+            font-size: 8.2px;
+            table-layout: fixed;
           }
           thead tr {
-            height: 22px;
+            height: 18px;
           }
           th {
             background: #e2e8f0;
             color: #0f172a;
             text-transform: uppercase;
-            font-size: 8.5px;
+            font-size: 7.5px;
             font-weight: 900;
-            padding: 3px 6px;
+            padding: 1.5px 3px;
             border-bottom: 1.5px solid #94a3b8;
             text-align: left;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
           }
           td {
-            padding: 2px 6px;
+            padding: 1px 3px;
             border-bottom: 1px solid #e2e8f0;
             white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
             vertical-align: middle;
           }
           tr:nth-child(even) td {
@@ -649,17 +658,27 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
             <div class="table-card">
               <div class="table-header">
                 <span>ESCALAFÓN DE PRODUCTOS (${productSortOrder === 'ASC' ? 'DE MENOR A MAYOR ↑' : 'DE MAYOR A MENOR ↓'}) — CALIDAD Y COMERCIAL</span>
-                <span>${productAnalytics.escalafonList.length} referencias analizadas</span>
+                <span>${productAnalytics.escalafonList.length} referencias</span>
               </div>
               <table>
+                <colgroup>
+                  <col style="width:4%;" />
+                  <col style="width:27%;" />
+                  <col style="width:14%;" />
+                  <col style="width:14%;" />
+                  <col style="width:6%;" />
+                  <col style="width:6%;" />
+                  <col style="width:14%;" />
+                  <col style="width:15%;" />
+                </colgroup>
                 <thead>
                   <tr>
                     <th style="text-align:center;">#</th>
                     <th>Producto</th>
                     <th style="text-align:right;">Comercial</th>
                     <th style="text-align:right;">Calidad</th>
-                    <th style="text-align:center;">Lech.</th>
-                    <th style="text-align:center;">Vacío</th>
+                    <th style="text-align:center;">Lech</th>
+                    <th style="text-align:center;">Vac</th>
                     <th style="text-align:right;">Total</th>
                     <th>Acción</th>
                   </tr>
@@ -673,9 +692,18 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
             <div class="table-card">
               <div class="table-header">
                 <span>ESCALAFÓN DE ZONAS Y VENDEDORES OFICIALES</span>
-                <span>14 Vendedores + Z14 y Puntos de Venta</span>
+                <span>14 Vendedores + Z14/PDV</span>
               </div>
               <table>
+                <colgroup>
+                  <col style="width:5%;" />
+                  <col style="width:31%;" />
+                  <col style="width:14%;" />
+                  <col style="width:15%;" />
+                  <col style="width:14%;" />
+                  <col style="width:12%;" />
+                  <col style="width:9%;" />
+                </colgroup>
                 <thead>
                   <tr>
                     <th style="text-align:center;">#</th>
