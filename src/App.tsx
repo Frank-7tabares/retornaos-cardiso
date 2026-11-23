@@ -680,7 +680,7 @@ export function App() {
                 <ClipboardCheck className="h-3.5 w-3.5" />
                 {currentUser.role === 'VENDEDOR' || currentUser.role === 'PDV'
                   ? 'Mis Devoluciones'
-                  : '2. Mis Devoluciones (Vendedores)'}
+                  : '2. Devoluciones por Zona'}
               </button>
 
               {/* 3. Ingenieras de Producción: EXCLUSIVO para Calidad y Admin */}

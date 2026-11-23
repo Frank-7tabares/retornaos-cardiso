@@ -41,42 +41,71 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
   returnRows,
   currentUser,
 }) => {
-  const [dateFilter, setDateFilter] = useState<string>('ALL');
+  const [dateFrom, setDateFrom] = useState<string>('');
+  const [dateTo, setDateTo] = useState<string>('');
   const [productSortOrder, setProductSortOrder] = useState<'ASC' | 'DESC'>('ASC');
   const [zoneSortBy, setZoneSortBy] = useState<
     'SALES_DESC' | 'SALES_ASC' | 'RETURNS_DESC'
   >('SALES_DESC');
 
   // Fechas disponibles y fecha máxima de corte
-  const { availableDates, minDate, maxDate } = useMemo(() => {
+  const {
+    availableDatesChronological,
+    minDate,
+    maxDate,
+    secondToLastDate,
+  } = useMemo(() => {
     const dates = new Set<string>();
     for (const r of returnRows) {
       if (r.date) dates.add(r.date);
     }
     const sorted = Array.from(dates).sort();
+    const minD = sorted[0] || '2026-11-01';
+    const maxD = sorted[sorted.length - 1] || '2026-11-05';
+    const prevD = sorted.length >= 2 ? sorted[sorted.length - 2] : maxD;
     return {
-      availableDates: [...sorted].reverse(),
-      minDate: sorted[0] || '2026-11-01',
-      maxDate: sorted[sorted.length - 1] || '2026-11-05',
+      availableDatesChronological: sorted,
+      minDate: minD,
+      maxDate: maxD,
+      secondToLastDate: prevD,
     };
   }, [returnRows]);
 
-  // Filas filtradas por fecha seleccionada
-  const filteredRows = useMemo(() => {
-    if (dateFilter === 'ALL') return returnRows;
-    return returnRows.filter((r) => r.date === dateFilter);
-  }, [returnRows, dateFilter]);
+  const effectiveDateFrom = dateFrom || minDate;
+  const effectiveDateTo = dateTo || maxDate;
+  const isDateRangeActive = Boolean(dateFrom || dateTo);
 
-  // Zonas con métricas recalculadas según filtro de fecha
+  // Filas filtradas por el rango de día a día seleccionado
+  const filteredRows = useMemo(() => {
+    if (!dateFrom && !dateTo) return returnRows;
+    return returnRows.filter((r) => {
+      if (dateFrom && r.date < dateFrom) return false;
+      if (dateTo && r.date > dateTo) return false;
+      return true;
+    });
+  }, [returnRows, dateFrom, dateTo]);
+
+  // Zonas con métricas recalculadas según el rango de día a día y normalizadas por ZONA (sin nombres de personas)
   const zoneMetricsList = useMemo(() => {
     const sellerZones = zones.filter((z) => z.id !== 'Z15');
     return sellerZones.map((z) => {
-      if (dateFilter === 'ALL') {
-        return computeZoneMetrics(z);
+      const cleanZoneLabel =
+        z.type === 'RUTA_VENDEDOR'
+          ? `ZONA ${z.code}`
+          : z.consolidatedName;
+      const normalizedBase: ZoneSummary = {
+        ...z,
+        consolidatedName: cleanZoneLabel,
+        sheetName: cleanZoneLabel,
+        currentSeller: cleanZoneLabel,
+      };
+
+      if (!isDateRangeActive) {
+        return computeZoneMetrics(normalizedBase);
       }
       const zRows = filteredRows.filter((r) => r.zoneId === z.id);
       const customZone: ZoneSummary = {
-        ...z,
+        ...normalizedBase,
         lineItemsCount: zRows.length,
         unitsByCause: {
           aCobrar: 0,
@@ -116,7 +145,7 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
       }
       return computeZoneMetrics(customZone);
     });
-  }, [zones, filteredRows, dateFilter]);
+  }, [zones, filteredRows, isDateRangeActive]);
 
   // Zona que MÁS vende y zona que MENOS vende (entre rutas de vendedores)
   const { topSellingZone, lowestSellingZone, sortedZones } = useMemo(() => {
@@ -297,8 +326,7 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
   // Generador de Impresión / PDF ocupando el 100% de la hoja completa
   const handlePrintSinglePageReport = () => {
     const logoUrl = `${window.location.origin}/cardiso_logo.png`;
-    const activePeriodLabel =
-      dateFilter === 'ALL' ? `${minDate} al ${maxDate}` : `Fecha: ${dateFilter}`;
+    const activePeriodLabel = `${effectiveDateFrom} al ${effectiveDateTo}`;
 
     const ROW_COUNT = Math.max(22, sortedZones.length);
 
@@ -695,7 +723,7 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
 
             <div class="table-card">
               <div class="table-header">
-                <span>ESCALAFÓN DE ZONAS Y VENDEDORES</span>
+                <span>ESCALAFÓN DE ZONAS COMERCIALES</span>
                 <span>Z01–Z16 · Z14 · PDV</span>
               </div>
               <table>
@@ -711,7 +739,7 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
                 <thead>
                   <tr>
                     <th style="text-align:center;">#</th>
-                    <th>Zona / Vendedor</th>
+                    <th>Zona Comercial</th>
                     <th style="text-align:right;">Ventas Mes</th>
                     <th style="text-align:right;">Comerc.</th>
                     <th style="text-align:right;">Calidad</th>
@@ -800,25 +828,81 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
       maxWidthClass="max-w-7xl"
     >
       <div className="space-y-4 text-xs text-slate-200">
-        {/* Barra Superior de Controles Rápidos */}
+        {/* Barra Superior de Controles Rápidos (Rango Día a Día) */}
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-emerald-500/30 bg-slate-900/90 px-4 py-2.5">
           <div className="flex flex-wrap items-center gap-2">
             <Calendar className="h-4 w-4 text-emerald-400" />
-            <span className="font-semibold text-white">Fecha:</span>
-            <select
-              value={dateFilter}
-              onChange={(e) => setDateFilter(e.target.value)}
-              className="rounded-xl border border-white/20 bg-slate-950 px-2.5 py-1 font-mono text-xs font-semibold text-emerald-300 focus:border-emerald-400 focus:outline-none"
+            <span className="font-semibold text-white">Rango Día a Día:</span>
+
+            <div className="flex items-center gap-1 rounded-xl border border-white/15 bg-slate-950 px-2.5 py-1">
+              <span className="text-[11px] font-bold text-emerald-300">Desde:</span>
+              <select
+                value={dateFrom || minDate}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setDateFrom(val);
+                  if (dateTo && val > dateTo) setDateTo(val);
+                }}
+                className="bg-transparent font-mono text-xs font-semibold text-white focus:outline-none"
+              >
+                {availableDatesChronological.map((d) => (
+                  <option key={`rep-from-${d}`} value={d} className="bg-slate-900 text-white">
+                    Día {d.slice(8, 10)} ({d})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex items-center gap-1 rounded-xl border border-white/15 bg-slate-950 px-2.5 py-1">
+              <span className="text-[11px] font-bold text-amber-300">Hasta:</span>
+              <select
+                value={dateTo || maxDate}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setDateTo(val);
+                  if (dateFrom && val < dateFrom) setDateFrom(val);
+                }}
+                className="bg-transparent font-mono text-xs font-semibold text-white focus:outline-none"
+              >
+                {availableDatesChronological.map((d) => (
+                  <option key={`rep-to-${d}`} value={d} className="bg-slate-900 text-white">
+                    Día {d.slice(8, 10)} ({d})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {availableDatesChronological.length >= 2 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setDateFrom(minDate);
+                  setDateTo(secondToLastDate);
+                }}
+                className={`rounded-xl border px-2.5 py-1 text-xs font-bold transition-all ${
+                  dateFrom === minDate && dateTo === secondToLastDate
+                    ? 'border-amber-400 bg-amber-500 text-slate-950'
+                    : 'border-amber-400/40 bg-amber-500/15 text-amber-200 hover:bg-amber-500/25'
+                }`}
+              >
+                Sin el último día (Día {minDate.slice(8, 10)} al {secondToLastDate.slice(8, 10)})
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => {
+                setDateFrom('');
+                setDateTo('');
+              }}
+              className={`rounded-xl border px-2.5 py-1 text-xs font-semibold transition-all ${
+                !isDateRangeActive
+                  ? 'border-emerald-400 bg-emerald-600 text-white'
+                  : 'border-white/15 bg-slate-800 text-slate-300'
+              }`}
             >
-              <option value="ALL">
-                Acumulado ({minDate} a {maxDate})
-              </option>
-              {availableDates.map((d) => (
-                <option key={d} value={d}>
-                  Solo Fecha: {d}
-                </option>
-              ))}
-            </select>
+              Todos
+            </button>
 
             <button
               type="button"
@@ -880,9 +964,9 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
                   INFORME GERENCIAL DE VENTAS, CALIDAD E INVENTARIOS
                 </h2>
                 <p className="text-[11px] text-slate-300">
-                  Generado por: <strong>Sebastián (Administrador General)</strong> · Cambios hasta:{' '}
+                  Generado por: <strong>Sebastián (Administrador General)</strong> · Rango auditado:{' '}
                   <strong className="font-mono text-emerald-300">
-                    {dateFilter === 'ALL' ? maxDate : dateFilter}
+                    {effectiveDateFrom} al {effectiveDateTo}
                   </strong>
                 </p>
               </div>
@@ -1134,7 +1218,7 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
                   <thead>
                     <tr className="border-b border-white/10 bg-slate-950/60 text-[9px] font-bold uppercase text-slate-400">
                       <th className="py-1.5 pl-2.5 pr-1">#</th>
-                      <th className="px-1.5 py-1.5">Zona / Vendedor</th>
+                      <th className="px-1.5 py-1.5">Zona Comercial</th>
                       <th className="px-1.5 py-1.5 text-right text-emerald-300">Ventas</th>
                       <th className="px-1.5 py-1.5 text-right">Dev. Total</th>
                       <th className="py-1.5 pl-1 pr-2.5 text-right">% Inc</th>

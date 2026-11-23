@@ -135,7 +135,8 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
   const [forceTableOnMobile, setForceTableOnMobile] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [lotFilter, setLotFilter] = useState<string>('ALL');
-  const [dateFilter, setDateFilter] = useState<string>('ALL');
+  const [dateFrom, setDateFrom] = useState<string>('');
+  const [dateTo, setDateTo] = useState<string>('');
   const [causeFilter, setCauseFilter] = useState<
     'ALL' | 'PROX_VENCER_GROUP' | 'CALIDAD_GROUP' | ReturnCauseKey
   >('ALL');
@@ -246,8 +247,8 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
     return Array.from(map.values()).sort((a, b) => b.units - a.units);
   }, [returnRows, activeZone, searchAllZonesForLot]);
 
-  // Extract all unique Dates available across rows (sorted newest to oldest)
-  const availableDates = useMemo(() => {
+  // Extract all unique Dates available across rows (sorted oldest to newest for day-to-day range)
+  const availableDatesChronological = useMemo(() => {
     const map = new Map<string, { date: string; count: number; units: number }>();
     const sourceRows = searchAllZonesForLot
       ? returnRows
@@ -264,8 +265,27 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
       prev.units += r.qtyToReceive;
       map.set(r.date, prev);
     }
-    return Array.from(map.values()).sort((a, b) => b.date.localeCompare(a.date));
+    return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date));
   }, [returnRows, activeZone, searchAllZonesForLot]);
+
+  const availableDates = useMemo(
+    () => [...availableDatesChronological].reverse(),
+    [availableDatesChronological]
+  );
+
+  const minAvailableDate =
+    availableDatesChronological[0]?.date || '2026-10-01';
+  const maxAvailableDate =
+    availableDatesChronological[availableDatesChronological.length - 1]?.date ||
+    '2026-11-05';
+  const secondToLastDate =
+    availableDatesChronological.length >= 2
+      ? availableDatesChronological[availableDatesChronological.length - 2].date
+      : maxAvailableDate;
+
+  const effectiveDateFrom = dateFrom || minAvailableDate;
+  const effectiveDateTo = dateTo || maxAvailableDate;
+  const isDateRangeActive = Boolean(dateFrom || dateTo);
 
   const handleSelectZone = (newZoneId: string) => {
     if (newZoneId === selectedZoneId) return;
@@ -304,19 +324,24 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
     returnRows,
   ]);
 
+  // Filas de la zona filtradas por el RANGO DE DÍA A DÍA (actualiza los 4 paneles superiores)
   const baseZoneRows = useMemo(() => {
     if (!activeZone) return [];
     return returnRows.filter((r) => {
       if (!searchAllZonesForLot && r.zoneId !== activeZone.id) return false;
+      if (dateFrom && r.date < dateFrom) return false;
+      if (dateTo && r.date > dateTo) return false;
+      if (lotFilter !== 'ALL' && r.lotNumber !== lotFilter) return false;
       return true;
     });
-  }, [returnRows, activeZone, searchAllZonesForLot]);
+  }, [returnRows, activeZone, searchAllZonesForLot, dateFrom, dateTo, lotFilter]);
 
   const zoneRows = useMemo(() => {
     if (!activeZone) return [];
     return returnRows.filter((r) => {
       if (!searchAllZonesForLot && r.zoneId !== activeZone.id) return false;
-      if (dateFilter !== 'ALL' && r.date !== dateFilter) return false;
+      if (dateFrom && r.date < dateFrom) return false;
+      if (dateTo && r.date > dateTo) return false;
       if (lotFilter !== 'ALL' && r.lotNumber !== lotFilter) return false;
       if (causeFilter === 'PROX_VENCER_GROUP') {
         if (r.causes.proxVencer + r.causes.vencido <= 0) return false;
@@ -350,7 +375,8 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
     returnRows,
     activeZone,
     searchAllZonesForLot,
-    dateFilter,
+    dateFrom,
+    dateTo,
     lotFilter,
     causeFilter,
     statusFilter,
@@ -697,7 +723,7 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
             <h1 className="text-lg sm:text-2xl font-bold tracking-tight text-neutral-900 dark:text-white">
               {currentUser.role === 'VENDEDOR' || currentUser.role === 'PDV'
                 ? `Mis Devoluciones — ${activeZone?.consolidatedName || currentUser.name}`
-                : `Devoluciones por Vendedor — ${activeZone?.consolidatedName || 'Todas las Zonas'}`}
+                : `Devoluciones por Zona — ${activeZone?.consolidatedName || 'Todas las Zonas'}`}
             </h1>
             {activeZone && !searchAllZonesForLot && (
               <Badge variant="indigo">{activeZone.code}</Badge>
@@ -707,15 +733,18 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
                 Todas las Zonas
               </Badge>
             )}
+            <Badge variant="success" dot>
+              📅 Rango: {effectiveDateFrom} al {effectiveDateTo}
+            </Badge>
           </div>
           <p className="mt-0.5 text-xs sm:text-sm text-neutral-600 dark:text-slate-300">
             {currentUser.role === 'VENDEDOR' || currentUser.role === 'PDV' ? (
               <>
-                Aquí puedes consultar todas las devoluciones de tu zona sincronizadas desde el archivo oficial de <strong>Despachos / HGI</strong>.
+                Consulta tus devoluciones filtrando por <strong>rango de día a día</strong> (ej. del día 1 al 17 sin el 18). Los 4 paneles se actualizan automáticamente según el rango de fechas elegido.
               </>
             ) : (
               <>
-                Consulta de devoluciones sincronizadas desde el Excel diario en <strong>MySQL (retorna_db)</strong> por cada zona y vendedor.
+                Consulta de devoluciones sincronizadas desde el Excel diario en <strong>MySQL (retorna_db)</strong> por cada <strong>Zona</strong> y rango de fechas.
               </>
             )}
           </p>
@@ -783,7 +812,143 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
         </div>
       </div>
 
-      {/* Resumen Ejecutivo de Mis Devoluciones (4 Tarjetas Rápidas Interactivas para el Vendedor) */}
+      {/* ===================================================================== */}
+      {/* PANEL DE RANGO DE DÍA A DÍA (DESDE EL DÍA X HASTA EL DÍA Y)           */}
+      {/* ===================================================================== */}
+      <div className="rounded-2xl border border-emerald-500/35 bg-slate-900/85 backdrop-blur-2xl p-3.5 sm:p-4 shadow-xl space-y-3">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex items-start sm:items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-300">
+              <Calendar className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs sm:text-sm font-bold text-white">
+                  Filtro por Rango de Día a Día (Actualiza los 4 Paneles Superiores):
+                </span>
+                <span className="rounded-lg bg-emerald-500/25 border border-emerald-400/40 px-2.5 py-0.5 font-mono text-xs font-extrabold text-emerald-300">
+                  Del {effectiveDateFrom} al {effectiveDateTo}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-300 mt-0.5">
+                Selecciona <strong>Desde qué día</strong> y <strong>Hasta qué día</strong> deseas ver (por ejemplo: del día 1 al 17 sin incluir el 18).
+              </p>
+            </div>
+          </div>
+
+          {/* Selectores Desde / Hasta + Botones Rápidos */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1.5 rounded-xl border border-white/15 bg-slate-950/80 px-2.5 py-1.5">
+              <span className="text-[11px] font-bold text-emerald-300">
+                Desde:
+              </span>
+              <select
+                value={dateFrom || minAvailableDate}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setDateFrom(val);
+                  if (dateTo && val > dateTo) setDateTo(val);
+                }}
+                className="bg-transparent font-mono text-xs font-bold text-white focus:outline-none cursor-pointer"
+              >
+                {availableDatesChronological.map((item) => (
+                  <option
+                    key={`from-${item.date}`}
+                    value={item.date}
+                    className="bg-slate-900 text-white"
+                  >
+                    Día {item.date.slice(8, 10)} ({item.date})
+                  </option>
+                ))}
+              </select>
+              <input
+                type="date"
+                value={dateFrom || minAvailableDate}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setDateFrom(val);
+                  if (dateTo && val > dateTo) setDateTo(val);
+                }}
+                className="w-6 bg-transparent text-xs text-emerald-300 focus:outline-none cursor-pointer"
+                title="Elegir fecha inicial en calendario"
+              />
+            </div>
+
+            <div className="flex items-center gap-1.5 rounded-xl border border-white/15 bg-slate-950/80 px-2.5 py-1.5">
+              <span className="text-[11px] font-bold text-amber-300">
+                Hasta:
+              </span>
+              <select
+                value={dateTo || maxAvailableDate}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setDateTo(val);
+                  if (dateFrom && val < dateFrom) setDateFrom(val);
+                }}
+                className="bg-transparent font-mono text-xs font-bold text-white focus:outline-none cursor-pointer"
+              >
+                {availableDatesChronological.map((item) => (
+                  <option
+                    key={`to-${item.date}`}
+                    value={item.date}
+                    className="bg-slate-900 text-white"
+                  >
+                    Día {item.date.slice(8, 10)} ({item.date})
+                  </option>
+                ))}
+              </select>
+              <input
+                type="date"
+                value={dateTo || maxAvailableDate}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setDateTo(val);
+                  if (dateFrom && val < dateFrom) setDateFrom(val);
+                }}
+                className="w-6 bg-transparent text-xs text-amber-300 focus:outline-none cursor-pointer"
+                title="Elegir fecha final en calendario"
+              />
+            </div>
+
+            {availableDatesChronological.length >= 2 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setDateFrom(minAvailableDate);
+                  setDateTo(secondToLastDate);
+                  toast.info(
+                    `Rango aplicado: del ${minAvailableDate} al ${secondToLastDate} (excluyendo ${maxAvailableDate})`
+                  );
+                }}
+                className={`rounded-xl border px-3 py-1.5 text-xs font-bold transition-all ${
+                  dateFrom === minAvailableDate && dateTo === secondToLastDate
+                    ? 'border-amber-400 bg-amber-500 text-slate-950 shadow-sm'
+                    : 'border-amber-500/35 bg-amber-500/15 text-amber-300 hover:bg-amber-500/25'
+                }`}
+              >
+                Sin el último día (Del Día {minAvailableDate.slice(8, 10)} al Día {secondToLastDate.slice(8, 10)})
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => {
+                setDateFrom('');
+                setDateTo('');
+              }}
+              className={`rounded-xl border px-3 py-1.5 text-xs font-bold transition-all ${
+                !isDateRangeActive
+                  ? 'border-emerald-400 bg-emerald-600 text-white shadow-sm'
+                  : 'border-white/15 bg-slate-800 text-slate-300 hover:text-white'
+              }`}
+            >
+              Todos los Días ({availableDatesChronological.length})
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Resumen Ejecutivo de Mis Devoluciones (4 Tarjetas Rápidas Interactivas que cambian con el Rango de Día a Día) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <button
           type="button"
@@ -799,7 +964,7 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
           >
             <div className="flex items-center justify-between gap-1">
               <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400">
-                Total Mis Devoluciones
+                Total Devoluciones ({activeZone?.code || 'Zona'})
               </span>
               {causeFilter === 'ALL' && (
                 <span className="rounded-md bg-indigo-500/20 px-1.5 py-0.5 text-[9px] font-bold text-indigo-300">
@@ -814,7 +979,7 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
             </div>
             <p className="mt-1 text-[11px] text-indigo-400 font-medium">
               {formatNumber(zoneSummaryTotals.qtyToReceive)} unds en{' '}
-              {baseZoneRows.length} registros
+              {baseZoneRows.length} reg. ({effectiveDateFrom.slice(5)} a {effectiveDateTo.slice(5)})
             </p>
           </BentoCard>
         </button>
@@ -965,10 +1130,10 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
             </div>
             <div>
               <div className="text-xs font-semibold text-neutral-900 dark:text-white flex flex-wrap items-center gap-1.5">
-                <span>Filtro por Fecha (Col A), Lote (Col E) y Causa</span>
-                {dateFilter !== 'ALL' && (
+                <span>Filtro por Rango de Días (Col A), Lote (Col E) y Causa</span>
+                {isDateRangeActive && (
                   <Badge variant="success" dot>
-                    Fecha: {dateFilter}
+                    Rango: {effectiveDateFrom} al {effectiveDateTo}
                   </Badge>
                 )}
                 {lotFilter !== 'ALL' && (
@@ -978,7 +1143,7 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
                 )}
               </div>
               <p className="text-[11px] text-neutral-500 dark:text-slate-300">
-                Filtra tus devoluciones por fecha exacta, número de lote o motivo de devolución.
+                Haz clic en un día abajo para ver solo ese día, o usa el selector de rango arriba para ver de un día a otro (ej. del 1 al 17 sin el 18).
               </p>
             </div>
           </div>
@@ -1003,20 +1168,6 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
                 </span>
               </button>
             )}
-
-            {/* Dropdown Filter by Date */}
-            <select
-              value={dateFilter}
-              onChange={(e) => setDateFilter(e.target.value)}
-              className="w-full sm:w-auto rounded-xl border border-neutral-300 dark:border-white/15 bg-white/90 dark:bg-slate-950/80 px-3 py-2 font-mono text-xs font-semibold text-emerald-600 dark:text-emerald-300 focus:border-emerald-500 focus:outline-none"
-            >
-              <option value="ALL">Todas las Fechas ({availableDates.length})</option>
-              {availableDates.map((item) => (
-                <option key={item.date} value={item.date}>
-                  📅 {item.date} ({item.units} unds · {item.count} reg.)
-                </option>
-              ))}
-            </select>
 
             {/* Dropdown Filter by Cause */}
             <select
@@ -1065,14 +1216,15 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
               ))}
             </select>
 
-            {(dateFilter !== 'ALL' ||
+            {(isDateRangeActive ||
               lotFilter !== 'ALL' ||
               causeFilter !== 'ALL' ||
               searchAllZonesForLot) && (
               <button
                 type="button"
                 onClick={() => {
-                  setDateFilter('ALL');
+                  setDateFrom('');
+                  setDateTo('');
                   setLotFilter('ALL');
                   setCauseFilter('ALL');
                   setSearchAllZonesForLot(false);
@@ -1087,44 +1239,59 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
           </div>
         </div>
 
-        {/* Interactive Date Pills */}
-        {availableDates.length > 0 && (
+        {/* Interactive Date Pills (Chronological Day-by-Day) */}
+        {availableDatesChronological.length > 0 && (
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
             <span className="text-[11px] font-medium text-neutral-500 dark:text-slate-400 shrink-0 mr-1">
-              Fechas:
+              Días:
             </span>
             <button
               type="button"
-              onClick={() => setDateFilter('ALL')}
+              onClick={() => {
+                setDateFrom('');
+                setDateTo('');
+              }}
               className={`shrink-0 rounded-lg px-2.5 py-1 text-xs font-medium transition-all ${
-                dateFilter === 'ALL'
+                !isDateRangeActive
                   ? 'bg-emerald-600 text-white shadow-sm'
                   : 'bg-neutral-200/70 dark:bg-white/10 text-neutral-700 dark:text-slate-300 hover:bg-neutral-300 dark:hover:bg-white/20'
               }`}
             >
-              Todas
+              Todos
             </button>
-            {availableDates.map((item) => (
-              <button
-                key={item.date}
-                type="button"
-                onClick={() =>
-                  setDateFilter((prev) =>
-                    prev === item.date ? 'ALL' : item.date
-                  )
-                }
-                className={`shrink-0 inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 font-mono text-xs font-medium transition-all ${
-                  dateFilter === item.date
-                    ? 'border-emerald-400 bg-emerald-600 text-white shadow-sm'
-                    : 'border-neutral-300/80 dark:border-white/10 bg-white/60 dark:bg-slate-950/60 text-neutral-800 dark:text-slate-200 hover:border-emerald-400/50'
-                }`}
-              >
-                <span>📅 {item.date}</span>
-                <span className="rounded bg-black/20 px-1 text-[10px] opacity-80">
-                  {item.units}u
-                </span>
-              </button>
-            ))}
+            {availableDatesChronological.map((item) => {
+              const isInsideRange =
+                item.date >= effectiveDateFrom && item.date <= effectiveDateTo;
+              const isExactSingleDay =
+                dateFrom === item.date && dateTo === item.date;
+              return (
+                <button
+                  key={item.date}
+                  type="button"
+                  onClick={() => {
+                    if (isExactSingleDay) {
+                      setDateFrom('');
+                      setDateTo('');
+                    } else {
+                      setDateFrom(item.date);
+                      setDateTo(item.date);
+                    }
+                  }}
+                  className={`shrink-0 inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 font-mono text-xs font-medium transition-all ${
+                    isExactSingleDay
+                      ? 'border-emerald-400 bg-emerald-600 text-white shadow-sm font-bold'
+                      : isDateRangeActive && isInsideRange
+                      ? 'border-emerald-500/50 bg-emerald-500/20 text-emerald-200'
+                      : 'border-neutral-300/80 dark:border-white/10 bg-white/60 dark:bg-slate-950/60 text-neutral-800 dark:text-slate-200 hover:border-emerald-400/50'
+                  }`}
+                >
+                  <span>📅 Día {item.date.slice(8, 10)} ({item.date.slice(5)})</span>
+                  <span className="rounded bg-black/20 px-1 text-[10px] opacity-80">
+                    {item.units}u
+                  </span>
+                </button>
+              );
+            })}
           </div>
         )}
 

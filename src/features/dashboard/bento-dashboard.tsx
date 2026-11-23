@@ -69,7 +69,8 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
   const [channelFilter, setChannelFilter] = useState<'ALL' | ZoneType>('ALL');
   const [metricMode, setMetricMode] = useState<'COP' | 'UNITS'>('COP');
   const [searchQuery, setSearchQuery] = useState('');
-  const [dateFilter, setDateFilter] = useState<string>('ALL');
+  const [dateFrom, setDateFrom] = useState<string>('');
+  const [dateTo, setDateTo] = useState<string>('');
   const [escalafonOrder, setEscalafonOrder] = useState<'ASC' | 'DESC'>('ASC');
   const [escalafonCategory, setEscalafonCategory] = useState<
     'ALL' | 'COMERCIAL' | 'CALIDAD'
@@ -83,34 +84,64 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
   const [salesInput, setSalesInput] = useState('');
 
   // Fechas disponibles y fecha máxima de corte ("hasta el día que están los cambios")
-  const { availableDates, minDate, maxDate } = useMemo(() => {
+  const {
+    availableDatesChronological,
+    availableDates,
+    minDate,
+    maxDate,
+    secondToLastDate,
+  } = useMemo(() => {
     const set = new Set<string>();
     for (const r of returnRows) {
       if (r.date) set.add(r.date);
     }
     const sorted = Array.from(set).sort();
+    const minD = sorted[0] || '2026-11-01';
+    const maxD = sorted[sorted.length - 1] || '2026-11-05';
+    const prevD = sorted.length >= 2 ? sorted[sorted.length - 2] : maxD;
     return {
+      availableDatesChronological: sorted,
       availableDates: [...sorted].reverse(),
-      minDate: sorted[0] || '2026-11-01',
-      maxDate: sorted[sorted.length - 1] || '2026-11-05',
+      minDate: minD,
+      maxDate: maxD,
+      secondToLastDate: prevD,
     };
   }, [returnRows]);
 
-  // Filas filtradas por fecha seleccionada en la pantalla de inicio
+  const effectiveDateFrom = dateFrom || minDate;
+  const effectiveDateTo = dateTo || maxDate;
+  const isDateRangeActive = Boolean(dateFrom || dateTo);
+
+  // Filas filtradas por el rango de día a día seleccionado en la pantalla de inicio
   const dateFilteredRows = useMemo(() => {
-    if (dateFilter === 'ALL') return returnRows;
-    return returnRows.filter((r) => r.date === dateFilter);
-  }, [returnRows, dateFilter]);
+    if (!dateFrom && !dateTo) return returnRows;
+    return returnRows.filter((r) => {
+      if (dateFrom && r.date < dateFrom) return false;
+      if (dateTo && r.date > dateTo) return false;
+      return true;
+    });
+  }, [returnRows, dateFrom, dateTo]);
 
   const enrichedZones = useMemo(() => {
     const activeZones = zones.filter((z) => z.id !== 'Z15');
     return activeZones.map((z) => {
-      if (dateFilter === 'ALL') {
-        return computeZoneMetrics(z);
+      const cleanZoneLabel =
+        z.type === 'RUTA_VENDEDOR'
+          ? `ZONA ${z.code}`
+          : z.consolidatedName;
+      const normalizedBase: ZoneSummary = {
+        ...z,
+        consolidatedName: cleanZoneLabel,
+        sheetName: cleanZoneLabel,
+        currentSeller: cleanZoneLabel,
+      };
+
+      if (!isDateRangeActive) {
+        return computeZoneMetrics(normalizedBase);
       }
       const zRows = dateFilteredRows.filter((r) => r.zoneId === z.id);
       const customZone: ZoneSummary = {
-        ...z,
+        ...normalizedBase,
         lineItemsCount: zRows.length,
         unitsByCause: {
           aCobrar: 0,
@@ -150,7 +181,7 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
       }
       return computeZoneMetrics(customZone);
     });
-  }, [zones, dateFilteredRows, dateFilter]);
+  }, [zones, dateFilteredRows, isDateRangeActive]);
 
   const filteredZones = useMemo(() => {
     return enrichedZones.filter((z) => {
@@ -441,14 +472,14 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
                 📅 Cambios actualizados hasta el día: {maxDate}
               </Badge>
               <span className="rounded-full bg-emerald-500/20 backdrop-blur-md border border-emerald-400/40 px-3 py-0.5 text-xs font-semibold text-emerald-200">
-                Periodo cargado: {minDate} al {maxDate} · 14 Vendedores Oficiales
+                Rango activo: {effectiveDateFrom} al {effectiveDateTo} · Control por Zonas
               </span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-              Centro de Control Gerencial, Escalafón de Inventarios y Lotes
+              Centro de Control Gerencial por Zonas, Inventarios y Lotes
             </h1>
             <p className="text-xs sm:text-sm text-slate-200/95 leading-relaxed">
-              Información actualizada hasta el <strong>{maxDate}</strong>. Filtra por <strong>Fecha</strong> o por <strong>N° de Lote</strong>, consulta el <strong>Escalafón de Menor a Mayor</strong> de productos devueltos por <strong>Calidad y Comercial</strong> para bajar inventarios, y genera el <strong>Informe Ejecutivo Oficial</strong>.
+              Información actualizada hasta el <strong>{maxDate}</strong>. Filtra por <strong>Rango de Día a Día</strong> (ej. del 1 al 17 sin el 18), analiza el rendimiento por <strong>Zonas Oficiales (Z01–Z16)</strong> y consulta el <strong>Escalafón de Productos</strong> para bajar inventarios.
             </p>
           </div>
 
@@ -483,8 +514,8 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
         </div>
       </div>
 
-      {/* Barra de Corte de Fecha y Filtro por Fecha en la Pantalla de Inicio */}
-      <div className="rounded-2xl border border-emerald-500/30 bg-slate-900/80 backdrop-blur-xl p-3.5 sm:px-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between shadow-lg">
+      {/* Barra de Corte de Fecha y Filtro por Rango de Día a Día en la Pantalla de Inicio (Sebastián) */}
+      <div className="rounded-2xl border border-emerald-500/30 bg-slate-900/80 backdrop-blur-xl p-3.5 sm:px-5 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between shadow-lg">
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/20 border border-emerald-400/30 text-emerald-300">
             <Calendar className="h-4 w-4" />
@@ -492,63 +523,112 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs font-bold text-white">
-                Fecha de Corte en Sistema (Hasta el día que están los cambios):
+                Corte en Sistema: {maxDate} · Rango Día a Día:
               </span>
               <span className="rounded-lg bg-emerald-500/25 border border-emerald-400/40 px-2.5 py-0.5 font-mono text-xs font-extrabold text-emerald-300">
-                {maxDate}
+                Del {effectiveDateFrom} al {effectiveDateTo}
               </span>
-              {dateFilter !== 'ALL' && (
-                <Badge variant="warning" dot>
-                  Filtrando solo fecha: {dateFilter}
-                </Badge>
-              )}
             </div>
             <p className="text-[11px] text-slate-300">
-              Filtra todo el resumen de inicio por una fecha específica o visualiza el acumulado completo ({availableDates.length} fechas registradas).
+              Elige el rango de días a consultar (por ejemplo, del día 1 al 17 sin incluir el 18) para actualizar todas las zonas y paneles.
             </p>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1.5 rounded-xl border border-white/15 bg-slate-950/80 px-2.5 py-1.5">
+            <span className="text-[11px] font-bold text-emerald-300">
+              Desde:
+            </span>
+            <select
+              value={dateFrom || minDate}
+              onChange={(e) => {
+                const val = e.target.value;
+                setDateFrom(val);
+                if (dateTo && val > dateTo) setDateTo(val);
+              }}
+              className="bg-transparent font-mono text-xs font-bold text-white focus:outline-none cursor-pointer"
+            >
+              {availableDatesChronological.map((d) => (
+                <option key={`dash-from-${d}`} value={d} className="bg-slate-900 text-white">
+                  Día {d.slice(8, 10)} ({d})
+                </option>
+              ))}
+            </select>
+            <input
+              type="date"
+              value={dateFrom || minDate}
+              onChange={(e) => {
+                const val = e.target.value;
+                setDateFrom(val);
+                if (dateTo && val > dateTo) setDateTo(val);
+              }}
+              className="w-6 bg-transparent text-xs text-emerald-300 focus:outline-none cursor-pointer"
+            />
+          </div>
+
+          <div className="flex items-center gap-1.5 rounded-xl border border-white/15 bg-slate-950/80 px-2.5 py-1.5">
+            <span className="text-[11px] font-bold text-amber-300">
+              Hasta:
+            </span>
+            <select
+              value={dateTo || maxDate}
+              onChange={(e) => {
+                const val = e.target.value;
+                setDateTo(val);
+                if (dateFrom && val < dateFrom) setDateFrom(val);
+              }}
+              className="bg-transparent font-mono text-xs font-bold text-white focus:outline-none cursor-pointer"
+            >
+              {availableDatesChronological.map((d) => (
+                <option key={`dash-to-${d}`} value={d} className="bg-slate-900 text-white">
+                  Día {d.slice(8, 10)} ({d})
+                </option>
+              ))}
+            </select>
+            <input
+              type="date"
+              value={dateTo || maxDate}
+              onChange={(e) => {
+                const val = e.target.value;
+                setDateTo(val);
+                if (dateFrom && val < dateFrom) setDateFrom(val);
+              }}
+              className="w-6 bg-transparent text-xs text-amber-300 focus:outline-none cursor-pointer"
+            />
+          </div>
+
+          {availableDatesChronological.length >= 2 && (
+            <button
+              type="button"
+              onClick={() => {
+                setDateFrom(minDate);
+                setDateTo(secondToLastDate);
+              }}
+              className={`rounded-xl px-3 py-1.5 text-xs font-bold transition-all ${
+                dateFrom === minDate && dateTo === secondToLastDate
+                  ? 'bg-amber-500 text-slate-950 shadow-sm'
+                  : 'bg-amber-500/15 text-amber-300 border border-amber-500/30 hover:bg-amber-500/25'
+              }`}
+            >
+              Sin el último día (Día {minDate.slice(8, 10)} al {secondToLastDate.slice(8, 10)})
+            </button>
+          )}
+
           <button
             type="button"
-            onClick={() => setDateFilter('ALL')}
+            onClick={() => {
+              setDateFrom('');
+              setDateTo('');
+            }}
             className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
-              dateFilter === 'ALL'
+              !isDateRangeActive
                 ? 'bg-emerald-600 text-white shadow-sm'
                 : 'bg-slate-800/90 text-slate-300 hover:text-white border border-white/10'
             }`}
           >
-            Todas las Fechas ({minDate} a {maxDate})
+            Todos los Días ({availableDates.length})
           </button>
-          {availableDates.slice(0, 6).map((d) => (
-            <button
-              key={d}
-              type="button"
-              onClick={() => setDateFilter(dateFilter === d ? 'ALL' : d)}
-              className={`rounded-xl px-2.5 py-1.5 font-mono text-xs font-semibold transition-all ${
-                dateFilter === d
-                  ? 'bg-emerald-500 text-slate-950 font-bold shadow-sm'
-                  : 'bg-slate-800/80 text-emerald-300 hover:bg-slate-700 border border-emerald-500/25'
-              }`}
-            >
-              📅 {d}
-            </button>
-          ))}
-          {availableDates.length > 6 && (
-            <select
-              value={dateFilter}
-              onChange={(e) => setDateFilter(e.target.value)}
-              className="rounded-xl border border-white/20 bg-slate-900 px-2.5 py-1.5 font-mono text-xs text-white focus:border-emerald-400 focus:outline-none"
-            >
-              <option value="ALL">Ver todas ({availableDates.length})</option>
-              {availableDates.map((d) => (
-                <option key={d} value={d}>
-                  Fecha: {d}
-                </option>
-              ))}
-            </select>
-          )}
         </div>
       </div>
 
@@ -628,9 +708,9 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
 
         <div className="inline-flex flex-wrap items-center gap-1 rounded-2xl border border-white/30 dark:border-white/15 bg-white/75 dark:bg-slate-900/70 p-1 backdrop-blur-xl shadow-lg">
           {[
-            { id: 'ALL', label: 'Todos los Canales (23)' },
-            { id: 'RUTA_VENDEDOR', label: 'Vendedores Z01–Z16 (14)' },
-            { id: 'CLIENTE_ESPECIAL_Z14', label: 'Clientes Z14 (4)' },
+            { id: 'ALL', label: ' Todas las Zonas (23)' },
+            { id: 'RUTA_VENDEDOR', label: 'Zonas Z01–Z16 (14)' },
+            { id: 'CLIENTE_ESPECIAL_Z14', label: 'Zonas Z14 (4)' },
             { id: 'PUNTO_DE_VENTA', label: 'Puntos de Venta (5)' },
           ].map((tab) => (
             <button
@@ -786,7 +866,7 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
                   Escalafón de Productos Devueltos por Calidad y Comercial ({escalafonOrder === 'ASC' ? 'De Menor a Mayor ↑' : 'De Mayor a Menor ↓'})
                 </h2>
                 <Badge variant="success" dot>
-                  Corte al {dateFilter === 'ALL' ? maxDate : dateFilter}
+                  Rango: {effectiveDateFrom} al {effectiveDateTo}
                 </Badge>
               </div>
               <p className="mt-1 text-xs text-neutral-600 dark:text-slate-300">
@@ -1046,24 +1126,24 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
           <div className="flex flex-col gap-3 border-b border-neutral-200/70 dark:border-white/10 p-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-base font-semibold text-neutral-900 dark:text-white">
-                  Matriz Consolidada por Zona, Cliente Z14 y Punto de Venta
-                </h2>
-                <Badge variant="success">Sin #REF!</Badge>
+                  <h2 className="text-base font-semibold text-neutral-900 dark:text-white">
+                    Matriz Consolidada por Zona Comercial (Z01–Z16, Z14 y Puntos de Venta)
+                  </h2>
+                  <Badge variant="success">Control por Zonas</Badge>
+                </div>
+                <p className="mt-0.5 text-xs text-neutral-600 dark:text-slate-300">
+                  Haz clic en cualquier fila para abrir las devoluciones de esa Zona o edita sus Ventas del Mes.
+                </p>
               </div>
-              <p className="mt-0.5 text-xs text-neutral-600 dark:text-slate-300">
-                Haz clic en cualquier fila para abrir la planilla de ese vendedor/punto de venta o edita sus Ventas del Mes.
-              </p>
-            </div>
 
-            <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 w-full sm:w-auto">
-              <div className="relative w-full sm:w-auto">
-                <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-neutral-400" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Buscar zona o vendedor..."
+              <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 w-full sm:w-auto">
+                <div className="relative w-full sm:w-auto">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-neutral-400" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Buscar por código de zona..."
                   className="w-full sm:w-48 rounded-xl border border-neutral-300 dark:border-white/15 bg-white/80 dark:bg-slate-950/60 pl-8 pr-3 py-1.5 text-xs text-neutral-900 dark:text-white placeholder:text-neutral-400 focus:border-indigo-500 focus:outline-none"
                 />
               </div>

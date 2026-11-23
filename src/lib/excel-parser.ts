@@ -115,22 +115,22 @@ export function resolveSheetZone(sheetName: string): {
     const existingZone = REAL_ZONES_SUMMARY.find((z) => z.id === zoneId);
     return {
       zoneId,
-      zoneName: existingZone ? existingZone.consolidatedName : sheetName.trim(),
+      zoneName: existingZone ? existingZone.consolidatedName : `ZONA ${zoneId}`,
     };
   }
 
   // 2. Clientes Especiales Z14
   if (clean.includes('FRONTINO')) {
-    return { zoneId: 'Z14-FRONTINO', zoneName: 'FRONTINO-GOMEZ ALBEIRO (Z14)' };
+    return { zoneId: 'Z14-FRONTINO', zoneName: 'ZONA Z14 - FRONTINO' };
   }
   if (clean.includes('GAMALIEL') || clean.includes('MACHADO')) {
-    return { zoneId: 'Z14-GAMALIEL', zoneName: 'MACHADO GAMALIEL (Z14)' };
+    return { zoneId: 'Z14-GAMALIEL', zoneName: 'ZONA Z14 - MAYORISTA 2' };
   }
   if (clean.includes('CROCANTES')) {
-    return { zoneId: 'Z14-CROCANTES', zoneName: 'ALIMENTOS CROCANTES (Z14)' };
+    return { zoneId: 'Z14-CROCANTES', zoneName: 'ZONA Z14 - CROCANTES' };
   }
   if (clean.includes('URREGO')) {
-    return { zoneId: 'Z14-URREGO', zoneName: 'URREGO NARIÑO ANTONIO (Z14)' };
+    return { zoneId: 'Z14-URREGO', zoneName: 'ZONA Z14 - MAYORISTA 4' };
   }
 
   // 3. Puntos de Venta (PDV)
