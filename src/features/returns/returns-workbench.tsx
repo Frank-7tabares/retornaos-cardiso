@@ -324,7 +324,7 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
     returnRows,
   ]);
 
-  // Filas de la zona filtradas por el RANGO DE DÍA A DÍA (actualiza los 4 paneles superiores)
+  // Filas de la zona filtradas por Rango de Día a Día, Lote, Estado y Búsqueda (actualiza los 4 paneles superiores)
   const baseZoneRows = useMemo(() => {
     if (!activeZone) return [];
     return returnRows.filter((r) => {
@@ -332,9 +332,30 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
       if (dateFrom && r.date < dateFrom) return false;
       if (dateTo && r.date > dateTo) return false;
       if (lotFilter !== 'ALL' && r.lotNumber !== lotFilter) return false;
+      if (statusFilter !== 'ALL' && r.reconciliationStatus !== statusFilter)
+        return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        return (
+          r.clientName.toLowerCase().includes(q) ||
+          r.productName.toLowerCase().includes(q) ||
+          r.lotNumber.toLowerCase().includes(q) ||
+          r.observations.toLowerCase().includes(q) ||
+          r.zoneName.toLowerCase().includes(q)
+        );
+      }
       return true;
     });
-  }, [returnRows, activeZone, searchAllZonesForLot, dateFrom, dateTo, lotFilter]);
+  }, [
+    returnRows,
+    activeZone,
+    searchAllZonesForLot,
+    dateFrom,
+    dateTo,
+    lotFilter,
+    statusFilter,
+    searchQuery,
+  ]);
 
   const zoneRows = useMemo(() => {
     if (!activeZone) return [];
@@ -812,143 +833,7 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
         </div>
       </div>
 
-      {/* ===================================================================== */}
-      {/* PANEL DE RANGO DE DÍA A DÍA (DESDE EL DÍA X HASTA EL DÍA Y)           */}
-      {/* ===================================================================== */}
-      <div className="rounded-2xl border border-emerald-500/35 bg-slate-900/85 backdrop-blur-2xl p-3.5 sm:p-4 shadow-xl space-y-3">
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-          <div className="flex items-start sm:items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-300">
-              <Calendar className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs sm:text-sm font-bold text-white">
-                  Filtro por Rango de Día a Día (Actualiza los 4 Paneles Superiores):
-                </span>
-                <span className="rounded-lg bg-emerald-500/25 border border-emerald-400/40 px-2.5 py-0.5 font-mono text-xs font-extrabold text-emerald-300">
-                  Del {effectiveDateFrom} al {effectiveDateTo}
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-300 mt-0.5">
-                Selecciona <strong>Desde qué día</strong> y <strong>Hasta qué día</strong> deseas ver (por ejemplo: del día 1 al 17 sin incluir el 18).
-              </p>
-            </div>
-          </div>
-
-          {/* Selectores Desde / Hasta + Botones Rápidos */}
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1.5 rounded-xl border border-white/15 bg-slate-950/80 px-2.5 py-1.5">
-              <span className="text-[11px] font-bold text-emerald-300">
-                Desde:
-              </span>
-              <select
-                value={dateFrom || minAvailableDate}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setDateFrom(val);
-                  if (dateTo && val > dateTo) setDateTo(val);
-                }}
-                className="bg-transparent font-mono text-xs font-bold text-white focus:outline-none cursor-pointer"
-              >
-                {availableDatesChronological.map((item) => (
-                  <option
-                    key={`from-${item.date}`}
-                    value={item.date}
-                    className="bg-slate-900 text-white"
-                  >
-                    Día {item.date.slice(8, 10)} ({item.date})
-                  </option>
-                ))}
-              </select>
-              <input
-                type="date"
-                value={dateFrom || minAvailableDate}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setDateFrom(val);
-                  if (dateTo && val > dateTo) setDateTo(val);
-                }}
-                className="w-6 bg-transparent text-xs text-emerald-300 focus:outline-none cursor-pointer"
-                title="Elegir fecha inicial en calendario"
-              />
-            </div>
-
-            <div className="flex items-center gap-1.5 rounded-xl border border-white/15 bg-slate-950/80 px-2.5 py-1.5">
-              <span className="text-[11px] font-bold text-amber-300">
-                Hasta:
-              </span>
-              <select
-                value={dateTo || maxAvailableDate}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setDateTo(val);
-                  if (dateFrom && val < dateFrom) setDateFrom(val);
-                }}
-                className="bg-transparent font-mono text-xs font-bold text-white focus:outline-none cursor-pointer"
-              >
-                {availableDatesChronological.map((item) => (
-                  <option
-                    key={`to-${item.date}`}
-                    value={item.date}
-                    className="bg-slate-900 text-white"
-                  >
-                    Día {item.date.slice(8, 10)} ({item.date})
-                  </option>
-                ))}
-              </select>
-              <input
-                type="date"
-                value={dateTo || maxAvailableDate}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setDateTo(val);
-                  if (dateFrom && val < dateFrom) setDateFrom(val);
-                }}
-                className="w-6 bg-transparent text-xs text-amber-300 focus:outline-none cursor-pointer"
-                title="Elegir fecha final en calendario"
-              />
-            </div>
-
-            {availableDatesChronological.length >= 2 && (
-              <button
-                type="button"
-                onClick={() => {
-                  setDateFrom(minAvailableDate);
-                  setDateTo(secondToLastDate);
-                  toast.info(
-                    `Rango aplicado: del ${minAvailableDate} al ${secondToLastDate} (excluyendo ${maxAvailableDate})`
-                  );
-                }}
-                className={`rounded-xl border px-3 py-1.5 text-xs font-bold transition-all ${
-                  dateFrom === minAvailableDate && dateTo === secondToLastDate
-                    ? 'border-amber-400 bg-amber-500 text-slate-950 shadow-sm'
-                    : 'border-amber-500/35 bg-amber-500/15 text-amber-300 hover:bg-amber-500/25'
-                }`}
-              >
-                Sin el último día (Del Día {minAvailableDate.slice(8, 10)} al Día {secondToLastDate.slice(8, 10)})
-              </button>
-            )}
-
-            <button
-              type="button"
-              onClick={() => {
-                setDateFrom('');
-                setDateTo('');
-              }}
-              className={`rounded-xl border px-3 py-1.5 text-xs font-bold transition-all ${
-                !isDateRangeActive
-                  ? 'border-emerald-400 bg-emerald-600 text-white shadow-sm'
-                  : 'border-white/15 bg-slate-800 text-slate-300 hover:text-white'
-              }`}
-            >
-              Todos los Días ({availableDatesChronological.length})
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Resumen Ejecutivo de Mis Devoluciones (4 Tarjetas Rápidas Interactivas que cambian con el Rango de Día a Día) */}
+      {/* Resumen Ejecutivo de Mis Devoluciones (4 Tarjetas Rápidas Interactivas que cambian con todos los filtros de abajo) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <button
           type="button"
@@ -964,22 +849,26 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
           >
             <div className="flex items-center justify-between gap-1">
               <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400">
-                Total Devoluciones ({activeZone?.code || 'Zona'})
+                Total Devoluciones ({searchAllZonesForLot ? 'Global' : activeZone?.code || 'Zona'})
               </span>
-              {causeFilter === 'ALL' && (
+              {causeFilter === 'ALL' ? (
                 <span className="rounded-md bg-indigo-500/20 px-1.5 py-0.5 text-[9px] font-bold text-indigo-300">
                   Ver Todos
+                </span>
+              ) : (
+                <span className="rounded-md bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-bold text-emerald-300">
+                  Quitar filtro
                 </span>
               )}
             </div>
             <div className="mt-1 flex items-baseline gap-2">
               <span className="font-mono text-xl sm:text-2xl font-extrabold text-neutral-900 dark:text-white">
-                {formatCOP(zoneSummaryTotals.totalCOP)}
+                {formatCOP(tableTotals.totalCOP)}
               </span>
             </div>
             <p className="mt-1 text-[11px] text-indigo-400 font-medium">
-              {formatNumber(zoneSummaryTotals.qtyToReceive)} unds en{' '}
-              {baseZoneRows.length} reg. ({effectiveDateFrom.slice(5)} a {effectiveDateTo.slice(5)})
+              {formatNumber(tableTotals.qtyToReceive)} unds en{' '}
+              {zoneRows.length} reg. ({effectiveDateFrom.slice(5)} a {effectiveDateTo.slice(5)})
             </p>
           </BentoCard>
         </button>
@@ -1121,21 +1010,19 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
         </button>
       </div>
 
-      {/* Interactive Date, Lot & Cause Explorer Bar (Mobile Responsive) */}
+      {/* Interactive Date Range, Lot & Cause Explorer Bar (Directly Below the 4 Panels) */}
       <div className="rounded-2xl border border-white/60 dark:border-white/[0.14] bg-white/80 dark:bg-slate-900/65 backdrop-blur-2xl p-3.5 sm:p-4 shadow-xl space-y-3">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
               <Calendar className="h-4 w-4" />
             </div>
             <div>
               <div className="text-xs font-semibold text-neutral-900 dark:text-white flex flex-wrap items-center gap-1.5">
                 <span>Filtro por Rango de Días (Col A), Lote (Col E) y Causa</span>
-                {isDateRangeActive && (
-                  <Badge variant="success" dot>
-                    Rango: {effectiveDateFrom} al {effectiveDateTo}
-                  </Badge>
-                )}
+                <Badge variant="success" dot>
+                  Del {effectiveDateFrom} al {effectiveDateTo}
+                </Badge>
                 {lotFilter !== 'ALL' && (
                   <Badge variant="indigo" dot>
                     Lote L-{lotFilter}
@@ -1143,18 +1030,113 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
                 )}
               </div>
               <p className="text-[11px] text-neutral-500 dark:text-slate-300">
-                Haz clic en un día abajo para ver solo ese día, o usa el selector de rango arriba para ver de un día a otro (ej. del 1 al 17 sin el 18).
+                Elige <strong>Desde qué día</strong> y <strong>Hasta qué día</strong> (ej. del 1 al 17 sin el 18), lote o causa. Los 4 paneles de arriba se actualizan al instante.
               </p>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Selector Desde el día */}
+            <div className="flex items-center gap-1.5 rounded-xl border border-emerald-500/35 bg-slate-950/85 px-2.5 py-1.5">
+              <span className="text-[11px] font-bold text-emerald-300">
+                Desde:
+              </span>
+              <select
+                value={dateFrom || minAvailableDate}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setDateFrom(val);
+                  if (dateTo && val > dateTo) setDateTo(val);
+                }}
+                className="bg-transparent font-mono text-xs font-bold text-white focus:outline-none cursor-pointer"
+              >
+                {availableDatesChronological.map((item) => (
+                  <option
+                    key={`from-${item.date}`}
+                    value={item.date}
+                    className="bg-slate-900 text-white"
+                  >
+                    Día {item.date.slice(8, 10)} ({item.date})
+                  </option>
+                ))}
+              </select>
+              <input
+                type="date"
+                value={dateFrom || minAvailableDate}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setDateFrom(val);
+                  if (dateTo && val > dateTo) setDateTo(val);
+                }}
+                className="w-5 bg-transparent text-xs text-emerald-300 focus:outline-none cursor-pointer"
+                title="Elegir fecha inicial en calendario"
+              />
+            </div>
+
+            {/* Selector Hasta el día */}
+            <div className="flex items-center gap-1.5 rounded-xl border border-amber-500/35 bg-slate-950/85 px-2.5 py-1.5">
+              <span className="text-[11px] font-bold text-amber-300">
+                Hasta:
+              </span>
+              <select
+                value={dateTo || maxAvailableDate}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setDateTo(val);
+                  if (dateFrom && val < dateFrom) setDateFrom(val);
+                }}
+                className="bg-transparent font-mono text-xs font-bold text-white focus:outline-none cursor-pointer"
+              >
+                {availableDatesChronological.map((item) => (
+                  <option
+                    key={`to-${item.date}`}
+                    value={item.date}
+                    className="bg-slate-900 text-white"
+                  >
+                    Día {item.date.slice(8, 10)} ({item.date})
+                  </option>
+                ))}
+              </select>
+              <input
+                type="date"
+                value={dateTo || maxAvailableDate}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setDateTo(val);
+                  if (dateFrom && val < dateFrom) setDateFrom(val);
+                }}
+                className="w-5 bg-transparent text-xs text-amber-300 focus:outline-none cursor-pointer"
+                title="Elegir fecha final en calendario"
+              />
+            </div>
+
+            {/* Botón Rápido: Sin el último día (ej. del 1 al 17 sin el 18) */}
+            {availableDatesChronological.length >= 2 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setDateFrom(minAvailableDate);
+                  setDateTo(secondToLastDate);
+                  toast.info(
+                    `Mostrando devoluciones del ${minAvailableDate} al ${secondToLastDate} (excluyendo ${maxAvailableDate})`
+                  );
+                }}
+                className={`rounded-xl border px-3 py-1.5 text-xs font-bold transition-all ${
+                  dateFrom === minAvailableDate && dateTo === secondToLastDate
+                    ? 'border-amber-400 bg-amber-500 text-slate-950 shadow-sm'
+                    : 'border-amber-500/35 bg-amber-500/15 text-amber-300 hover:bg-amber-500/25'
+                }`}
+              >
+                Sin el último día (Día {minAvailableDate.slice(8, 10)} al {secondToLastDate.slice(8, 10)})
+              </button>
+            )}
+
             {/* Toggle Global Lot Search across all zones (Solo Admin, Calidad, Recepción) */}
             {currentUser.role !== 'VENDEDOR' && currentUser.role !== 'PDV' && (
               <button
                 type="button"
                 onClick={() => setSearchAllZonesForLot((prev) => !prev)}
-                className={`inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-medium transition-all ${
+                className={`inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-medium transition-all ${
                   searchAllZonesForLot
                     ? 'border-emerald-400/50 bg-emerald-500/20 text-emerald-700 dark:text-emerald-200'
                     : 'border-neutral-300 dark:border-white/15 bg-white/70 dark:bg-slate-950/60 text-neutral-700 dark:text-slate-300'
@@ -1181,7 +1163,7 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
                     | ReturnCauseKey
                 )
               }
-              className="w-full sm:w-auto rounded-xl border border-neutral-300 dark:border-white/15 bg-white/90 dark:bg-slate-950/80 px-3 py-2 text-xs font-medium text-neutral-900 dark:text-white focus:border-indigo-500 focus:outline-none"
+              className="w-full sm:w-auto rounded-xl border border-neutral-300 dark:border-white/15 bg-white/90 dark:bg-slate-950/80 px-3 py-1.5 text-xs font-medium text-neutral-900 dark:text-white focus:border-indigo-500 focus:outline-none"
             >
               <option value="ALL">Todas las 7 Causas (Cols G–M)</option>
               <option value="PROX_VENCER_GROUP">
@@ -1206,7 +1188,7 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
                   onClearExternalLotFilter();
                 }
               }}
-              className="w-full sm:w-auto rounded-xl border border-neutral-300 dark:border-white/15 bg-white/90 dark:bg-slate-950/80 px-3 py-2 font-mono text-xs font-semibold text-indigo-600 dark:text-indigo-300 focus:border-indigo-500 focus:outline-none"
+              className="w-full sm:w-auto rounded-xl border border-neutral-300 dark:border-white/15 bg-white/90 dark:bg-slate-950/80 px-3 py-1.5 font-mono text-xs font-semibold text-indigo-600 dark:text-indigo-300 focus:border-indigo-500 focus:outline-none"
             >
               <option value="ALL">Todos los Lotes ({availableLots.length})</option>
               {availableLots.map((item) => (
@@ -1230,7 +1212,7 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
                   setSearchAllZonesForLot(false);
                   if (onClearExternalLotFilter) onClearExternalLotFilter();
                 }}
-                className="inline-flex items-center justify-center gap-1 rounded-xl border border-rose-500/30 bg-rose-500/15 px-3 py-2 text-xs font-medium text-rose-400 hover:bg-rose-500/25"
+                className="inline-flex items-center justify-center gap-1 rounded-xl border border-rose-500/30 bg-rose-500/15 px-3 py-1.5 text-xs font-medium text-rose-400 hover:bg-rose-500/25"
               >
                 <X className="h-3.5 w-3.5" />
                 Limpiar

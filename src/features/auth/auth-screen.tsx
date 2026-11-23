@@ -87,35 +87,75 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         const emailAliases: Record<string, string> = {
           'sebastian@alimentoscarla.co': 'gerencia@alimentoscarla.co',
           'admin@alimentoscarla.co': 'gerencia@alimentoscarla.co',
-          'z02.villadiego@alimentoscarla.co': 'z02.restrepo@alimentoscarla.co',
-          'z15.montilla@alimentoscarla.co': 'z02.restrepo@alimentoscarla.co',
-          'z03.arango@alimentoscarla.co': 'z03.gonzalez@alimentoscarla.co',
-          'z04.restrepo@alimentoscarla.co': 'z04.calderon@alimentoscarla.co',
-          'z05.borja@alimentoscarla.co': 'z05.rodolfo@alimentoscarla.co',
-          'z06.giraldo@alimentoscarla.co': 'z06.sandra@alimentoscarla.co',
-          'z07.bonilla@alimentoscarla.co': 'z07.martinez@alimentoscarla.co',
-          'z08.quiroz@alimentoscarla.co': 'z08.restrepo@alimentoscarla.co',
-          'z10.jaraba@alimentoscarla.co': 'z10.restrepo@alimentoscarla.co',
+          'z01.moncada@alimentoscarla.co': 'z01@alimentoscarla.co',
+          'z02.restrepo@alimentoscarla.co': 'z02@alimentoscarla.co',
+          'z02.villadiego@alimentoscarla.co': 'z02@alimentoscarla.co',
+          'z15.montilla@alimentoscarla.co': 'z02@alimentoscarla.co',
+          'z03.gonzalez@alimentoscarla.co': 'z03@alimentoscarla.co',
+          'z03.arango@alimentoscarla.co': 'z03@alimentoscarla.co',
+          'z04.calderon@alimentoscarla.co': 'z04@alimentoscarla.co',
+          'z04.restrepo@alimentoscarla.co': 'z04@alimentoscarla.co',
+          'z05.rodolfo@alimentoscarla.co': 'z05@alimentoscarla.co',
+          'z05.borja@alimentoscarla.co': 'z05@alimentoscarla.co',
+          'z06.sandra@alimentoscarla.co': 'z06@alimentoscarla.co',
+          'z06.giraldo@alimentoscarla.co': 'z06@alimentoscarla.co',
+          'z07.martinez@alimentoscarla.co': 'z07@alimentoscarla.co',
+          'z07.bonilla@alimentoscarla.co': 'z07@alimentoscarla.co',
+          'z08.restrepo@alimentoscarla.co': 'z08@alimentoscarla.co',
+          'z08.quiroz@alimentoscarla.co': 'z08@alimentoscarla.co',
+          'z09.posso@alimentoscarla.co': 'z09@alimentoscarla.co',
+          'z10.restrepo@alimentoscarla.co': 'z10@alimentoscarla.co',
+          'z10.jaraba@alimentoscarla.co': 'z10@alimentoscarla.co',
+          'z11.arboleda@alimentoscarla.co': 'z11@alimentoscarla.co',
+          'z12.santiago@alimentoscarla.co': 'z12@alimentoscarla.co',
+          'z13.sebastian@alimentoscarla.co': 'z13@alimentoscarla.co',
+          'z16.pino@alimentoscarla.co': 'z16@alimentoscarla.co',
         };
         const resolvedEmail = emailAliases[targetEmail] || targetEmail;
-        const matched = DEMO_USERS.find((u) => u.email.toLowerCase() === resolvedEmail);
+        const matched = DEMO_USERS.find(
+          (u) =>
+            u.email.toLowerCase() === resolvedEmail ||
+            (u.assignedZoneId && u.assignedZoneId.toLowerCase() === resolvedEmail)
+        );
 
         if (!matched) {
-          setAuthError('Correo electrónico no registrado en el sistema.');
+          setAuthError('Correo electrónico o zona no registrada en el sistema.');
           toast.error('Acceso denegado', {
-            description: 'El correo corporativo no pertenece a ningún usuario activo.',
+            description: 'El correo corporativo no pertenece a ninguna zona activa.',
           });
           return;
         }
 
-        // Validación estricta de contraseña
-        const expectedPassword = matched.passwordHash || 'carla2024';
-        const enteredPassword = password.trim();
+        // Validación de contraseña: para vendedores es el número de su zona (ej. 01, 1, Z01, z01)
+        const expectedPassword = (matched.passwordHash || 'carla2024').toLowerCase();
+        const enteredPassword = password.trim().toLowerCase();
 
-        if (enteredPassword !== expectedPassword) {
-          setAuthError(`Contraseña incorrecta para ${matched.name}. Verifica tus credenciales.`);
+        const validPasswords = new Set<string>([expectedPassword]);
+        if (matched.assignedZoneId) {
+          const zId = matched.assignedZoneId.toUpperCase();
+          const numMatch = zId.match(/Z0?(\d{1,2})/i);
+          if (numMatch) {
+            const rawNum = String(Number(numMatch[1])); // ej. "1", "2", "10", "16"
+            const paddedNum = rawNum.padStart(2, '0');  // ej. "01", "02", "10", "16"
+            validPasswords.add(rawNum);
+            validPasswords.add(paddedNum);
+            validPasswords.add(`z${rawNum}`);
+            validPasswords.add(`z${paddedNum}`);
+            validPasswords.add(`zona ${rawNum}`);
+            validPasswords.add(`zona ${paddedNum}`);
+            validPasswords.add(`zona z${paddedNum}`);
+            validPasswords.add(`z${paddedNum}*carla`);
+          }
+        }
+
+        if (!validPasswords.has(enteredPassword)) {
+          setAuthError(
+            matched.role === 'VENDEDOR'
+              ? `Contraseña incorrecta para ${matched.name}. La contraseña es el número de la zona (ej. ${matched.passwordHash} o ${matched.assignedZoneId}).`
+              : `Contraseña incorrecta para ${matched.name}. Verifica tus credenciales.`
+          );
           toast.error('Contraseña incorrecta', {
-            description: `La contraseña ingresada no coincide con el perfil de ${matched.name}.`,
+            description: `La contraseña ingresada no coincide con ${matched.name}.`,
           });
           return;
         }
