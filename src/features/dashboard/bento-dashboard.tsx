@@ -136,7 +136,7 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
         currentSeller: cleanZoneLabel,
       };
 
-      if (!isDateRangeActive) {
+      if (returnRows.length === 0) {
         return computeZoneMetrics(normalizedBase);
       }
       const zRows = dateFilteredRows.filter((r) => r.zoneId === z.id);
@@ -279,8 +279,13 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
         commercialCOP: number;
         qualityUnits: number;
         qualityCOP: number;
-        lechozoUnits: number;
         vacioUnits: number;
+        lechozoUnits: number;
+        xFechaUnits: number;
+        abombaUnits: number;
+        proxVencerOnlyUnits: number;
+        vencidoUnits: number;
+        aCobrarUnits: number;
         proxVencerUnits: number;
         lots: Set<string>;
         zones: Set<string>;
@@ -288,6 +293,15 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
     >();
 
     for (const r of dateFilteredRows) {
+      // COMERCIAL (Ventas): próximo + vencido + x cobrar
+      const cUnits =
+        r.causes.proxVencer + r.causes.vencido + r.causes.aCobrar;
+      // CALIDAD (Producción): vacío + lechosidad + x fecha + embombamiento
+      const qUnits =
+        r.causes.vacio + r.causes.lechozo + r.causes.xFecha + r.causes.abomba;
+      const classifiedTotal = cUnits + qUnits;
+      if (classifiedTotal <= 0) continue;
+
       const key = r.productName;
       let item = map.get(key);
       if (!item) {
@@ -299,33 +313,39 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
           commercialCOP: 0,
           qualityUnits: 0,
           qualityCOP: 0,
-          lechozoUnits: 0,
           vacioUnits: 0,
+          lechozoUnits: 0,
+          xFechaUnits: 0,
+          abombaUnits: 0,
+          proxVencerOnlyUnits: 0,
+          vencidoUnits: 0,
+          aCobrarUnits: 0,
           proxVencerUnits: 0,
           lots: new Set<string>(),
           zones: new Set<string>(),
         };
         map.set(key, item);
       }
-      const cUnits =
-        r.causes.aCobrar + r.causes.proxVencer + r.causes.vencido;
-      const qUnits =
-        r.causes.vacio + r.causes.xFecha + r.causes.abomba + r.causes.lechozo;
 
-      item.totalUnits += r.qtyToReceive;
-      item.totalCOP += r.totalValueCOP;
+      item.totalUnits += classifiedTotal;
+      item.totalCOP += r.commercialValueCOP + r.qualityValueCOP;
       item.commercialUnits += cUnits;
       item.commercialCOP += r.commercialValueCOP;
       item.qualityUnits += qUnits;
       item.qualityCOP += r.qualityValueCOP;
-      item.lechozoUnits += r.causes.lechozo;
       item.vacioUnits += r.causes.vacio;
+      item.lechozoUnits += r.causes.lechozo;
+      item.xFechaUnits += r.causes.xFecha;
+      item.abombaUnits += r.causes.abomba;
+      item.proxVencerOnlyUnits += r.causes.proxVencer;
+      item.vencidoUnits += r.causes.vencido;
+      item.aCobrarUnits += r.causes.aCobrar;
       item.proxVencerUnits += r.causes.proxVencer + r.causes.vencido;
       if (r.lotNumber && r.lotNumber !== 'S/L') item.lots.add(r.lotNumber);
       item.zones.add(r.zoneId);
     }
 
-    let list = Array.from(map.values());
+    let list = Array.from(map.values()).filter((p) => p.totalUnits > 0);
     if (escalafonCategory === 'COMERCIAL') {
       list = list.filter((p) => p.commercialUnits > 0);
     } else if (escalafonCategory === 'CALIDAD') {
@@ -1031,84 +1051,100 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
         <div className="overflow-x-auto max-h-96">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-neutral-200/70 dark:border-white/10 bg-neutral-100/70 dark:bg-slate-950/70 text-[11px] font-semibold uppercase tracking-wider text-neutral-600 dark:text-slate-300">
-                <th className="py-3 pl-5 pr-2">Escalafón</th>
-                <th className="px-3 py-3">Producto / Referencia</th>
-                <th className="px-3 py-3 text-right text-amber-600 dark:text-amber-300">
-                  Comercial (Und / $)
+              <tr className="border-b border-neutral-200/70 dark:border-white/10 bg-neutral-100/70 dark:bg-slate-950/70 text-[10px] font-semibold uppercase tracking-wider text-neutral-600 dark:text-slate-300">
+                <th className="py-2.5 pl-4 pr-2">#</th>
+                <th className="px-2.5 py-2.5">Producto / Referencia</th>
+                <th className="px-2 py-2.5 text-center text-amber-300" title="Próximo a Vencer">Próx.</th>
+                <th className="px-2 py-2.5 text-center text-orange-300" title="Vencido">Venc.</th>
+                <th className="px-2 py-2.5 text-center text-rose-300" title="X Cobrar">Cobrar</th>
+                <th className="px-2.5 py-2.5 text-right text-amber-600 dark:text-amber-300 font-bold">
+                  Total Comercial
                 </th>
-                <th className="px-3 py-3 text-right text-sky-600 dark:text-sky-300">
-                  Calidad Planta (Und / $)
+                <th className="px-2 py-2.5 text-center text-sky-300" title="Vacío">Vacío</th>
+                <th className="px-2 py-2.5 text-center text-violet-300" title="Lechosidad">Lechos.</th>
+                <th className="px-2 py-2.5 text-center text-cyan-300" title="X Fecha">X Fecha</th>
+                <th className="px-2 py-2.5 text-center text-fuchsia-300" title="Embombamiento">Embomb.</th>
+                <th className="px-2.5 py-2.5 text-right text-sky-600 dark:text-sky-300 font-bold">
+                  Total Calidad
                 </th>
-                <th className="px-2.5 py-3 text-center text-violet-400">
-                  Lechosidad
-                </th>
-                <th className="px-2.5 py-3 text-center text-cyan-400">
-                  Vacío
-                </th>
-                <th className="px-3 py-3 text-right">Total Devuelto</th>
-                <th className="py-3 pl-3 pr-5">Acción p/ Bajar Inventario y Correctivo</th>
+                <th className="px-2.5 py-2.5 text-right font-extrabold">Total Dev.</th>
+                <th className="py-2.5 pl-2.5 pr-4">Acción Correctiva</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-200/50 dark:divide-white/[0.07] text-xs">
               {productEscalafonData.sorted.map((prod, idx) => {
                 const actionLabel =
                   prod.commercialUnits > prod.qualityUnits
-                    ? '📉 Bajar inventario en ruta / Ajustar pedido comercial'
+                    ? '📉 Bajar inventario en ruta'
                     : prod.lechozoUnits >= prod.vacioUnits && prod.lechozoUnits > 0
-                    ? '🔬 Correctivo Planta: Revisar choque térmico (Lechosidad)'
+                    ? '🔬 Controlar Lechosidad'
                     : prod.vacioUnits > 0
-                    ? '🛡️ Correctivo Planta: Auditar sellado al vacío'
-                    : '✅ Rotación estable (Mantener stock)';
+                    ? '🛡️ Auditar Sellado Vacío'
+                    : '✅ Rotación estable';
 
                 return (
                   <tr
                     key={prod.productName}
                     className="hover:bg-indigo-500/10 dark:hover:bg-white/[0.05] transition-colors"
                   >
-                    <td className="py-2.5 pl-5 pr-2 font-mono font-bold text-indigo-400">
+                    <td className="py-2 pl-4 pr-2 font-mono font-bold text-indigo-400">
                       #{idx + 1}
                     </td>
-                    <td className="px-3 py-2.5">
+                    <td className="px-2.5 py-2">
                       <div className="font-semibold text-neutral-900 dark:text-white">
                         {prod.productName}
                       </div>
-                      <div className="text-[11px] font-mono text-neutral-500 dark:text-slate-400">
+                      <div className="text-[10px] font-mono text-neutral-500 dark:text-slate-400">
                         {prod.zones.size} zona(s) · Lotes:{' '}
                         {Array.from(prod.lots).slice(0, 4).join(', ') || 'S/L'}
                       </div>
                     </td>
-                    <td className="px-3 py-2.5 text-right font-mono">
+                    <td className="px-2 py-2 text-center font-mono text-amber-300">
+                      {prod.proxVencerOnlyUnits || '—'}
+                    </td>
+                    <td className="px-2 py-2 text-center font-mono text-orange-300">
+                      {prod.vencidoUnits || '—'}
+                    </td>
+                    <td className="px-2 py-2 text-center font-mono text-rose-300">
+                      {prod.aCobrarUnits || '—'}
+                    </td>
+                    <td className="px-2.5 py-2 text-right font-mono bg-amber-950/15">
                       <span className="font-bold text-amber-600 dark:text-amber-300">
-                        {formatNumber(prod.commercialUnits)} und
+                        {formatNumber(prod.commercialUnits)} u
                       </span>
                       <div className="text-[10px] text-neutral-500 dark:text-slate-400">
                         {formatCOP(prod.commercialCOP)}
                       </div>
                     </td>
-                    <td className="px-3 py-2.5 text-right font-mono">
+                    <td className="px-2 py-2 text-center font-mono text-sky-300">
+                      {prod.vacioUnits || '—'}
+                    </td>
+                    <td className="px-2 py-2 text-center font-mono text-violet-300">
+                      {prod.lechozoUnits || '—'}
+                    </td>
+                    <td className="px-2 py-2 text-center font-mono text-cyan-300">
+                      {prod.xFechaUnits || '—'}
+                    </td>
+                    <td className="px-2 py-2 text-center font-mono text-fuchsia-300">
+                      {prod.abombaUnits || '—'}
+                    </td>
+                    <td className="px-2.5 py-2 text-right font-mono bg-sky-950/15">
                       <span className="font-bold text-sky-600 dark:text-sky-300">
-                        {formatNumber(prod.qualityUnits)} und
+                        {formatNumber(prod.qualityUnits)} u
                       </span>
                       <div className="text-[10px] text-neutral-500 dark:text-slate-400">
                         {formatCOP(prod.qualityCOP)}
                       </div>
                     </td>
-                    <td className="px-2.5 py-2.5 text-center font-mono font-semibold text-violet-300">
-                      {prod.lechozoUnits > 0 ? `${prod.lechozoUnits} u` : '—'}
-                    </td>
-                    <td className="px-2.5 py-2.5 text-center font-mono font-semibold text-cyan-300">
-                      {prod.vacioUnits > 0 ? `${prod.vacioUnits} u` : '—'}
-                    </td>
-                    <td className="px-3 py-2.5 text-right font-mono">
+                    <td className="px-2.5 py-2 text-right font-mono">
                       <div className="font-bold text-neutral-900 dark:text-white">
-                        {formatNumber(prod.totalUnits)} unds
+                        {formatNumber(prod.totalUnits)} u
                       </div>
                       <div className="text-[10px] text-emerald-400">
                         {formatCOP(prod.totalCOP)}
                       </div>
                     </td>
-                    <td className="py-2.5 pl-3 pr-5 text-[11px] text-neutral-700 dark:text-slate-200">
+                    <td className="py-2 pl-2.5 pr-4 text-[11px] text-neutral-700 dark:text-slate-200">
                       {actionLabel}
                     </td>
                   </tr>

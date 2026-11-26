@@ -100,7 +100,7 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
         currentSeller: cleanZoneLabel,
       };
 
-      if (!isDateRangeActive) {
+      if (returnRows.length === 0) {
         return computeZoneMetrics(normalizedBase);
       }
       const zRows = filteredRows.filter((r) => r.zoneId === z.id);
@@ -200,6 +200,13 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
     >();
 
     for (const r of filteredRows) {
+      const commU =
+        r.causes.aCobrar + r.causes.proxVencer + r.causes.vencido;
+      const qualU =
+        r.causes.vacio + r.causes.xFecha + r.causes.abomba + r.causes.lechozo;
+      const classifiedTotal = commU + qualU;
+      if (classifiedTotal <= 0) continue;
+
       const key = r.productName;
       let item = map.get(key);
       if (!item) {
@@ -225,12 +232,8 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
         };
         map.set(key, item);
       }
-      const commU =
-        r.causes.aCobrar + r.causes.proxVencer + r.causes.vencido;
-      const qualU =
-        r.causes.vacio + r.causes.xFecha + r.causes.abomba + r.causes.lechozo;
-      item.totalUnits += r.qtyToReceive;
-      item.totalCOP += r.totalValueCOP;
+      item.totalUnits += classifiedTotal;
+      item.totalCOP += r.commercialValueCOP + r.qualityValueCOP;
       item.commercialUnits += commU;
       item.commercialCOP += r.commercialValueCOP;
       item.qualityUnits += qualU;
@@ -247,7 +250,7 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
       item.zones.add(r.zoneId);
     }
 
-    const all = Array.from(map.values());
+    const all = Array.from(map.values()).filter((p) => p.totalUnits > 0);
     const byUnitsDesc = [...all].sort((a, b) => b.totalUnits - a.totalUnits);
     const byLechozo = [...all]
       .filter((p) => p.lechozoUnits > 0)
@@ -282,8 +285,6 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
       (acc, z) => acc + z.monthlySalesCOP,
       0
     );
-    const totalCOP = filteredRows.reduce((acc, r) => acc + r.totalValueCOP, 0);
-    const totalUnits = filteredRows.reduce((acc, r) => acc + r.qtyToReceive, 0);
     const commCOP = filteredRows.reduce(
       (acc, r) => acc + r.commercialValueCOP,
       0
@@ -303,6 +304,8 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
         r.causes.lechozo,
       0
     );
+    const totalCOP = commCOP + qualCOP;
+    const totalUnits = commUnits + qualUnits;
     const lechozoUnits = filteredRows.reduce(
       (acc, r) => acc + r.causes.lechozo,
       0

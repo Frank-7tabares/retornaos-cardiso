@@ -863,12 +863,11 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
             </div>
             <div className="mt-1 flex items-baseline gap-2">
               <span className="font-mono text-xl sm:text-2xl font-extrabold text-neutral-900 dark:text-white">
-                {formatCOP(tableTotals.totalCOP)}
+                {formatCOP(zoneSummaryTotals.totalCOP)}
               </span>
             </div>
             <p className="mt-1 text-[11px] text-indigo-400 font-medium">
-              {formatNumber(tableTotals.qtyToReceive)} unds en{' '}
-              {zoneRows.length} reg. ({effectiveDateFrom.slice(5)} a {effectiveDateTo.slice(5)})
+              {formatNumber(zoneSummaryTotals.totalClassified)} unds clasificadas ({effectiveDateFrom.slice(5)} a {effectiveDateTo.slice(5)})
             </p>
           </BentoCard>
         </button>
@@ -889,7 +888,7 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
           >
             <div className="flex items-center justify-between gap-1">
               <span className="text-[11px] font-semibold uppercase tracking-wider text-rose-400">
-                A Cobrar (Factura / Cruce)
+                Comercial · X Cobrar
               </span>
               <span
                 className={`rounded-md px-1.5 py-0.5 text-[9px] font-bold transition-colors ${
@@ -907,7 +906,7 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
               </span>
             </div>
             <p className="mt-1 text-[11px] text-neutral-500 dark:text-slate-300">
-              {formatNumber(zoneSummaryTotals.causes.aCobrar)} unidades a cobrar
+              {formatNumber(zoneSummaryTotals.causes.aCobrar)} unds x cobrar
             </p>
           </BentoCard>
         </button>
@@ -932,7 +931,7 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
           >
             <div className="flex items-center justify-between gap-1">
               <span className="text-[11px] font-semibold uppercase tracking-wider text-amber-400">
-                Próx. a Vencer / Vencido
+                Comercial · Próximo + Vencido
               </span>
               <span
                 className={`rounded-md px-1.5 py-0.5 text-[9px] font-bold transition-colors ${
@@ -957,7 +956,7 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
                 zoneSummaryTotals.causes.proxVencer +
                   zoneSummaryTotals.causes.vencido
               )}{' '}
-              unds rotación comercial
+              unds (Próx: {zoneSummaryTotals.causes.proxVencer} · Venc: {zoneSummaryTotals.causes.vencido})
             </p>
           </BentoCard>
         </button>
@@ -980,7 +979,7 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
           >
             <div className="flex items-center justify-between gap-1">
               <span className="text-[11px] font-semibold uppercase tracking-wider text-sky-400">
-                Calidad Planta (Vacío / Lechoso)
+                Calidad (Vacío · Lechoso · X Fecha · Embomb.)
               </span>
               <span
                 className={`rounded-md px-1.5 py-0.5 text-[9px] font-bold transition-colors ${
@@ -1004,7 +1003,7 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
                   zoneSummaryTotals.causes.xFecha +
                   zoneSummaryTotals.causes.abomba
               )}{' '}
-              unds calidad planta
+              unds (Vac: {zoneSummaryTotals.causes.vacio} · Lech: {zoneSummaryTotals.causes.lechozo} · Fec: {zoneSummaryTotals.causes.xFecha} · Emb: {zoneSummaryTotals.causes.abomba})
             </p>
           </BentoCard>
         </button>

@@ -98,18 +98,32 @@ export const ProductionEngineeringView: React.FC<
     return Array.from(map.keys()).sort();
   }, [returnRows]);
 
-  const filteredRows = useMemo(() => {
+  // Filas base invariantes (solo filtradas por Fecha y Lote cuando el usuario elige una Fecha o Lote, para que los datos de productos, semáforos y tabla NUNCA cambien ni se distorsionen al hacer clic en un producto o causa)
+  const basePeriodRows = useMemo(() => {
     return returnRows.filter((row) => {
-      if (
-        selectedProductFilter !== 'ALL' &&
-        row.productName !== selectedProductFilter
-      ) {
-        return false;
-      }
       if (selectedDateFilter !== 'ALL' && row.date !== selectedDateFilter) {
         return false;
       }
       if (selectedLotFilter !== 'ALL' && row.lotNumber !== selectedLotFilter) {
+        return false;
+      }
+      const qU =
+        row.causes.vacio +
+        row.causes.lechozo +
+        row.causes.xFecha +
+        row.causes.abomba;
+      const cU =
+        row.causes.proxVencer + row.causes.vencido + row.causes.aCobrar;
+      return qU + cU > 0;
+    });
+  }, [returnRows, selectedDateFilter, selectedLotFilter]);
+
+  const filteredRows = useMemo(() => {
+    return basePeriodRows.filter((row) => {
+      if (
+        selectedProductFilter !== 'ALL' &&
+        row.productName !== selectedProductFilter
+      ) {
         return false;
       }
       if (causeFilter === 'CALIDAD') {
@@ -135,20 +149,27 @@ export const ProductionEngineeringView: React.FC<
       return true;
     });
   }, [
-    returnRows,
+    basePeriodRows,
     selectedProductFilter,
-    selectedDateFilter,
-    selectedLotFilter,
     causeFilter,
     searchQuery,
   ]);
 
-  // Aggregate global KPI metrics
+  // Aggregate global KPI metrics (invariantes para el periodo/lote activo)
   const globalMetrics = useMemo(() => {
-    return filteredRows.reduce(
+    return basePeriodRows.reduce(
       (acc, r) => {
-        acc.totalUnits += r.qtyToReceive;
-        acc.totalCOP += r.totalValueCOP;
+        const qUnits =
+          r.causes.vacio +
+          r.causes.lechozo +
+          r.causes.xFecha +
+          r.causes.abomba;
+        const cUnits =
+          r.causes.proxVencer + r.causes.vencido + r.causes.aCobrar;
+        acc.totalUnits += qUnits + cUnits;
+        acc.qualityUnits += qUnits;
+        acc.commercialUnits += cUnits;
+        acc.totalCOP += r.qualityValueCOP + r.commercialValueCOP;
         acc.qualityCOP += r.qualityValueCOP;
         acc.commercialCOP += r.commercialValueCOP;
         acc.lechozoUnits += r.causes.lechozo;
@@ -162,6 +183,8 @@ export const ProductionEngineeringView: React.FC<
       },
       {
         totalUnits: 0,
+        qualityUnits: 0,
+        commercialUnits: 0,
         totalCOP: 0,
         qualityCOP: 0,
         commercialCOP: 0,
@@ -174,7 +197,7 @@ export const ProductionEngineeringView: React.FC<
         aCobrarUnits: 0,
       }
     );
-  }, [filteredRows]);
+  }, [basePeriodRows]);
 
   // Datos para las Gráficas de Ingeniería de Producción (Causas, Lotes y Fechas)
   const engineeringChartsData = useMemo(() => {
@@ -237,7 +260,7 @@ export const ProductionEngineeringView: React.FC<
       { date: string; qualityUnits: number; commercialUnits: number; totalUnits: number }
     >();
 
-    for (const r of filteredRows) {
+    for (const r of basePeriodRows) {
       const qU =
         r.causes.lechozo + r.causes.vacio + r.causes.xFecha + r.causes.abomba;
       const cU = r.causes.aCobrar + r.causes.proxVencer + r.causes.vencido;
@@ -251,7 +274,7 @@ export const ProductionEngineeringView: React.FC<
         };
         prevLot.qualityUnits += qU;
         prevLot.commercialUnits += cU;
-        prevLot.totalUnits += r.qtyToReceive;
+        prevLot.totalUnits += qU + cU;
         lotMap.set(r.lotNumber, prevLot);
       }
 
@@ -264,7 +287,7 @@ export const ProductionEngineeringView: React.FC<
         };
         prevDate.qualityUnits += qU;
         prevDate.commercialUnits += cU;
-        prevDate.totalUnits += r.qtyToReceive;
+        prevDate.totalUnits += qU + cU;
         dateMap.set(r.date, prevDate);
       }
     }
@@ -283,13 +306,13 @@ export const ProductionEngineeringView: React.FC<
       topLotsChart,
       timelineChart,
     };
-  }, [filteredRows, globalMetrics]);
+  }, [basePeriodRows, globalMetrics]);
 
-  // Consolidate Product vs Cause & Lots Matrix
-  const productMatrix = useMemo<ProductQualitySummary[]>(() => {
+  // Matriz Invariante de Productos (Calculada sobre todas las filas del periodo para que Semáforos y Tabla den SIEMPRE exactamente los mismos datos y no cambien al filtrar)
+  const allProductsMatrix = useMemo<ProductQualitySummary[]>(() => {
     const map = new Map<string, ProductQualitySummary>();
 
-    for (const r of filteredRows) {
+    for (const r of basePeriodRows) {
       const key = r.productName;
       let entry = map.get(key);
       if (!entry) {
@@ -318,15 +341,21 @@ export const ProductionEngineeringView: React.FC<
         map.set(key, entry);
       }
 
+      // CALIDAD (Producción): vacío + lechosidad + x fecha + embombamiento
       const qUnits =
-        r.causes.lechozo + r.causes.vacio + r.causes.xFecha + r.causes.abomba;
+        r.causes.vacio +
+        r.causes.lechozo +
+        r.causes.xFecha +
+        r.causes.abomba;
+      // COMERCIAL (Ventas): próximo + vencido + x cobrar
       const cUnits =
-        r.causes.aCobrar + r.causes.proxVencer + r.causes.vencido;
+        r.causes.proxVencer + r.causes.vencido + r.causes.aCobrar;
+      const classifiedTotal = qUnits + cUnits;
 
-      entry.totalUnits += r.qtyToReceive;
+      entry.totalUnits += classifiedTotal;
       entry.qualityUnits += qUnits;
       entry.commercialUnits += cUnits;
-      entry.totalCOP += r.totalValueCOP;
+      entry.totalCOP += r.qualityValueCOP + r.commercialValueCOP;
       entry.qualityCOP += r.qualityValueCOP;
       entry.commercialCOP += r.commercialValueCOP;
 
@@ -348,7 +377,7 @@ export const ProductionEngineeringView: React.FC<
           abomba: 0,
           proxVencer: 0,
         };
-        lotItem.totalUnits += r.qtyToReceive;
+        lotItem.totalUnits += classifiedTotal;
         lotItem.lechozo += r.causes.lechozo;
         lotItem.vacio += r.causes.vacio;
         lotItem.xFecha += r.causes.xFecha;
@@ -358,80 +387,88 @@ export const ProductionEngineeringView: React.FC<
       }
     }
 
-    const list = Array.from(map.values()).map((item) => {
-      const pairs: Array<[ReturnCauseKey, number]> = [
-        ['lechozo', item.causes.lechozo],
-        ['vacio', item.causes.vacio],
-        ['xFecha', item.causes.xFecha],
-        ['abomba', item.causes.abomba],
-        ['proxVencer', item.causes.proxVencer],
-        ['vencido', item.causes.vencido],
-        ['aCobrar', item.causes.aCobrar],
-      ];
-      pairs.sort((a, b) => b[1] - a[1]);
-      item.dominantCauseKey = pairs[0][0];
-      item.dominantCauseUnits = pairs[0][1];
-      return item;
-    });
+    const list = Array.from(map.values())
+      .filter((item) => item.totalUnits > 0)
+      .map((item) => {
+        const pairs: Array<[ReturnCauseKey, number]> = [
+          ['lechozo', item.causes.lechozo],
+          ['vacio', item.causes.vacio],
+          ['xFecha', item.causes.xFecha],
+          ['abomba', item.causes.abomba],
+          ['proxVencer', item.causes.proxVencer],
+          ['vencido', item.causes.vencido],
+          ['aCobrar', item.causes.aCobrar],
+        ];
+        pairs.sort((a, b) => b[1] - a[1]);
+        item.dominantCauseKey = pairs[0][0];
+        item.dominantCauseUnits = pairs[0][1];
+        return item;
+      });
 
-    // Sort prioritizing quality defects (Lechozo + Vacío) or total units
     return list.sort((a, b) => {
-      if (causeFilter !== 'ALL' && causeFilter !== 'CALIDAD') {
-        return b.causes[causeFilter] - a.causes[causeFilter];
-      }
       if (b.qualityUnits !== a.qualityUnits) {
         return b.qualityUnits - a.qualityUnits;
       }
       return b.totalUnits - a.totalUnits;
     });
-  }, [filteredRows, causeFilter]);
+  }, [basePeriodRows]);
 
-  // Top Critical Quality Alerts (Product + Lot with high Lechosidad or Vacío)
+  // Tabla visible (muestra exactamente los mismos objetos invariantes de allProductsMatrix)
+  const productMatrix = useMemo<ProductQualitySummary[]>(() => {
+    return allProductsMatrix.filter((item) => {
+      if (
+        selectedProductFilter !== 'ALL' &&
+        item.productName !== selectedProductFilter
+      ) {
+        return false;
+      }
+      if (causeFilter === 'CALIDAD' && item.qualityUnits <= 0) {
+        return false;
+      }
+      if (
+        causeFilter !== 'ALL' &&
+        causeFilter !== 'CALIDAD' &&
+        item.causes[causeFilter] <= 0
+      ) {
+        return false;
+      }
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const hasLot = Array.from(item.lotsMap.keys()).some((l) =>
+          l.toLowerCase().includes(q)
+        );
+        if (!item.productName.toLowerCase().includes(q) && !hasLot) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [allProductsMatrix, selectedProductFilter, causeFilter, searchQuery]);
+
+  // Semáforo de Productos: usa EXACTAMENTE los mismos datos invariantes de allProductsMatrix que la tabla
   const topQualityAlerts = useMemo(() => {
-    const alerts: Array<{
-      productName: string;
-      totalDefectUnits: number;
-      mainDefectLabel: string;
-      mainDefectKey: ReturnCauseKey;
-      qualityCOP: number;
-      topLots: Array<{ lot: string; units: number }>;
-      recommendation: string;
-    }> = [];
-
-    for (const prod of productMatrix) {
-      if (prod.qualityUnits <= 0) continue;
-      const isLechozoMain = prod.causes.lechozo >= prod.causes.vacio;
-      const mainKey: ReturnCauseKey = isLechozoMain ? 'lechozo' : 'vacio';
-      const meta =
-        CAUSE_METADATA.find((c) => c.key === mainKey) || CAUSE_METADATA[3];
-
+    return allProductsMatrix.slice(0, 4).map((prod) => {
       const sortedLots = Array.from(prod.lotsMap.values())
-        .filter((l) => l.lechozo + l.vacio + l.xFecha + l.abomba > 0)
-        .sort(
-          (a, b) =>
-            b.lechozo + b.vacio - (a.lechozo + a.vacio)
-        )
-        .slice(0, 4)
+        .sort((a, b) => b.totalUnits - a.totalUnits)
+        .slice(0, 5)
         .map((l) => ({
           lot: l.lot,
-          units: l.lechozo + l.vacio + l.xFecha + l.abomba,
+          units: l.totalUnits,
         }));
 
-      alerts.push({
+      return {
         productName: prod.productName,
-        totalDefectUnits: prod.qualityUnits,
-        mainDefectLabel: isLechozoMain
-          ? `${prod.causes.lechozo} und por Lechosidad`
-          : `${prod.causes.vacio} und por Pérdida de Vacío`,
-        mainDefectKey: mainKey,
+        totalUnits: prod.totalUnits,
+        totalCOP: prod.totalCOP,
+        qualityUnits: prod.qualityUnits,
         qualityCOP: prod.qualityCOP,
+        commercialUnits: prod.commercialUnits,
+        commercialCOP: prod.commercialCOP,
+        causes: prod.causes,
         topLots: sortedLots,
-        recommendation: meta.recommendedAction,
-      });
-    }
-
-    return alerts.slice(0, 4);
-  }, [productMatrix]);
+      };
+    });
+  }, [allProductsMatrix]);
 
   const handleExportQualityCSV = () => {
     const headers = [
@@ -535,84 +572,132 @@ export const ProductionEngineeringView: React.FC<
           </div>
         </div>
 
-        {/* 5 Executive KPI Cards */}
-        <div className="mt-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          <div className="rounded-2xl border border-violet-500/35 bg-violet-500/10 p-3.5">
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-violet-300">
-              Devolución por Lechosidad
+        {/* 2 Bloques Oficiales Invariantes: CALIDAD (Producción) y COMERCIAL (Ventas) */}
+        <div className="mt-5 grid grid-cols-1 lg:grid-cols-12 gap-3.5">
+          {/* Bloque CALIDAD (Producción): Vacío, Lechosidad, X Fecha, Embombamiento */}
+          <div className="lg:col-span-7 rounded-2xl border border-sky-500/35 bg-sky-950/25 p-4 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-sky-500/20 pb-2.5">
+              <div>
+                <span className="text-xs font-extrabold uppercase tracking-wider text-sky-300">
+                  1. CALIDAD (Producción) — Vacío · Lechosidad · X Fecha · Embombamiento
+                </span>
+                <p className="text-[11px] text-slate-300">
+                  Suma exacta de las 4 causales de planta
+                </p>
+              </div>
+              <div className="text-right">
+                <div className="font-mono text-lg sm:text-xl font-extrabold text-sky-300">
+                  {formatNumber(globalMetrics.qualityUnits)} und · {formatCOP(globalMetrics.qualityCOP)}
+                </div>
+                <span className="text-[10px] text-sky-200/80">
+                  {globalMetrics.totalUnits > 0
+                    ? `${formatPercent((globalMetrics.qualityUnits / globalMetrics.totalUnits) * 100)} de las unidades`
+                    : '0%'}
+                </span>
+              </div>
             </div>
-            <div className="mt-1 text-xl font-bold font-mono text-white">
-              {formatNumber(globalMetrics.lechozoUnits)} und
-            </div>
-            <div className="text-[11px] text-violet-200/80 mt-0.5">
-              Exudado / Choques térmicos
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              <div className="rounded-xl border border-sky-500/30 bg-slate-900/80 p-2.5">
+                <div className="text-[10px] font-bold uppercase text-sky-300">
+                  • Vacío
+                </div>
+                <div className="mt-0.5 font-mono text-lg font-extrabold text-white">
+                  {formatNumber(globalMetrics.vacioUnits)} und
+                </div>
+              </div>
+              <div className="rounded-xl border border-violet-500/30 bg-slate-900/80 p-2.5">
+                <div className="text-[10px] font-bold uppercase text-violet-300">
+                  • Lechosidad
+                </div>
+                <div className="mt-0.5 font-mono text-lg font-extrabold text-white">
+                  {formatNumber(globalMetrics.lechozoUnits)} und
+                </div>
+              </div>
+              <div className="rounded-xl border border-cyan-500/30 bg-slate-900/80 p-2.5">
+                <div className="text-[10px] font-bold uppercase text-cyan-300">
+                  • X Fecha
+                </div>
+                <div className="mt-0.5 font-mono text-lg font-extrabold text-white">
+                  {formatNumber(globalMetrics.xFechaUnits)} und
+                </div>
+              </div>
+              <div className="rounded-xl border border-fuchsia-500/30 bg-slate-900/80 p-2.5">
+                <div className="text-[10px] font-bold uppercase text-fuchsia-300">
+                  • Embombamiento
+                </div>
+                <div className="mt-0.5 font-mono text-lg font-extrabold text-white">
+                  {formatNumber(globalMetrics.abombaUnits)} und
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="rounded-2xl border border-sky-500/35 bg-sky-500/10 p-3.5">
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-sky-300">
-              Pérdida de Vacío
+          {/* Bloque COMERCIAL (Ventas): Próximo, Vencido, X Cobrar */}
+          <div className="lg:col-span-5 rounded-2xl border border-amber-500/35 bg-amber-950/25 p-4 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-500/20 pb-2.5">
+              <div>
+                <span className="text-xs font-extrabold uppercase tracking-wider text-amber-300">
+                  2. COMERCIAL (Ventas) — Próximo · Vencido · X Cobrar
+                </span>
+                <p className="text-[11px] text-slate-300">
+                  Suma exacta de las 3 causales comerciales (Total Global: {formatNumber(globalMetrics.totalUnits)} und)
+                </p>
+              </div>
+              <div className="text-right">
+                <div className="font-mono text-lg sm:text-xl font-extrabold text-amber-300">
+                  {formatNumber(globalMetrics.commercialUnits)} und · {formatCOP(globalMetrics.commercialCOP)}
+                </div>
+                <span className="text-[10px] text-amber-200/80">
+                  {globalMetrics.totalUnits > 0
+                    ? `${formatPercent((globalMetrics.commercialUnits / globalMetrics.totalUnits) * 100)} de las unidades`
+                    : '0%'}
+                </span>
+              </div>
             </div>
-            <div className="mt-1 text-xl font-bold font-mono text-white">
-              {formatNumber(globalMetrics.vacioUnits)} und
-            </div>
-            <div className="text-[11px] text-sky-200/80 mt-0.5">
-              Sellado / Empaque termoformado
-            </div>
-          </div>
 
-          <div className="rounded-2xl border border-cyan-500/35 bg-cyan-500/10 p-3.5">
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-cyan-300">
-              Por Fecha / Abombamiento
-            </div>
-            <div className="mt-1 text-xl font-bold font-mono text-white">
-              {formatNumber(globalMetrics.xFechaUnits + globalMetrics.abombaUnits)} und
-            </div>
-            <div className="text-[11px] text-cyan-200/80 mt-0.5">
-              Marcación / Gasificación
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-emerald-500/35 bg-emerald-500/10 p-3.5">
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-emerald-300">
-              Impacto Planta (Calidad)
-            </div>
-            <div className="mt-1 text-lg font-bold font-mono text-emerald-300">
-              {formatCOP(globalMetrics.qualityCOP)}
-            </div>
-            <div className="text-[11px] text-emerald-200/80 mt-0.5">
-              {globalMetrics.totalCOP > 0
-                ? `${formatPercent((globalMetrics.qualityCOP / globalMetrics.totalCOP) * 100)} del total`
-                : '0%'}
-            </div>
-          </div>
-
-          <div className="col-span-2 sm:col-span-1 rounded-2xl border border-amber-500/35 bg-amber-500/10 p-3.5">
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-amber-300">
-              Impacto Comercial (Ruta)
-            </div>
-            <div className="mt-1 text-lg font-bold font-mono text-amber-300">
-              {formatCOP(globalMetrics.commercialCOP)}
-            </div>
-            <div className="text-[11px] text-amber-200/80 mt-0.5">
-              Próx. Vencer: {formatNumber(globalMetrics.proxVencerUnits)} und
+            <div className="grid grid-cols-3 gap-2.5">
+              <div className="rounded-xl border border-amber-500/30 bg-slate-900/80 p-2.5">
+                <div className="text-[10px] font-bold uppercase text-amber-300">
+                  • Próximo
+                </div>
+                <div className="mt-0.5 font-mono text-lg font-extrabold text-white">
+                  {formatNumber(globalMetrics.proxVencerUnits)} und
+                </div>
+              </div>
+              <div className="rounded-xl border border-orange-500/30 bg-slate-900/80 p-2.5">
+                <div className="text-[10px] font-bold uppercase text-orange-300">
+                  • Vencido
+                </div>
+                <div className="mt-0.5 font-mono text-lg font-extrabold text-white">
+                  {formatNumber(globalMetrics.vencidoUnits)} und
+                </div>
+              </div>
+              <div className="rounded-xl border border-rose-500/30 bg-slate-900/80 p-2.5">
+                <div className="text-[10px] font-bold uppercase text-rose-300">
+                  • X Cobrar
+                </div>
+                <div className="mt-0.5 font-mono text-lg font-extrabold text-white">
+                  {formatNumber(globalMetrics.aCobrarUnits)} und
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Radar of Critical Products & Lots (Semáforo de Calidad) */}
+      {/* Radar of Critical Products & Lots (Semáforo de Productos sincronizado 100% con la Tabla) */}
       {topQualityAlerts.length > 0 && (
         <div className="rounded-3xl border border-violet-500/30 bg-slate-950/85 backdrop-blur-2xl p-4 sm:p-6 shadow-xl">
           <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
             <div className="flex items-center gap-2">
               <ShieldAlert className="h-5 w-5 text-violet-400" />
               <h2 className="text-sm sm:text-base font-bold text-white">
-                Semáforo de Productos Críticos en Planta (Mayor Devolución por Lechosidad y Vacío)
+                Semáforo de Productos (Mismos Datos Exactos que la Tabla Consolidada)
               </h2>
             </div>
-            <span className="text-xs text-slate-400">
-              Haz clic en cualquier tarjeta o lote para filtrar su trazabilidad
+            <span className="text-xs text-emerald-300 font-medium">
+              Calidad (Vacío + Lechosidad + X Fecha + Embomb.) + Comercial (Próximo + Vencido + X Cobrar) = Total Devuelto
             </span>
           </div>
 
@@ -635,10 +720,10 @@ export const ProductionEngineeringView: React.FC<
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="inline-flex items-center gap-1 rounded-lg bg-rose-500/20 border border-rose-500/30 px-2 py-0.5 text-[10px] font-bold text-rose-300">
-                    #{idx + 1} Crítico Planta
+                    #{idx + 1} Producto
                   </span>
-                  <span className="font-mono text-xs font-bold text-violet-300">
-                    {formatCOP(alert.qualityCOP)}
+                  <span className="font-mono text-xs font-extrabold text-white">
+                    Total: {formatNumber(alert.totalUnits)} und ({formatCOP(alert.totalCOP)})
                   </span>
                 </div>
 
@@ -646,15 +731,37 @@ export const ProductionEngineeringView: React.FC<
                   {alert.productName}
                 </h3>
 
-                <div className="mt-1.5 flex items-center gap-2 text-xs font-semibold text-amber-300">
-                  <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                  <span>{alert.mainDefectLabel}</span>
+                {/* Desglose Exacto Calidad (Producción) */}
+                <div className="mt-2.5 rounded-xl border border-sky-500/25 bg-sky-950/30 p-2 space-y-1">
+                  <div className="flex items-center justify-between text-[11px] font-bold text-sky-300">
+                    <span>CALIDAD (Producción):</span>
+                    <span className="font-mono">{alert.qualityUnits} und · {formatCOP(alert.qualityCOP)}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1 text-[10px] font-mono text-slate-200">
+                    <span>• Vacío: <strong>{alert.causes.vacio}</strong></span>
+                    <span>• Lechosidad: <strong>{alert.causes.lechozo}</strong></span>
+                    <span>• X Fecha: <strong>{alert.causes.xFecha}</strong></span>
+                    <span>• Embomb.: <strong>{alert.causes.abomba}</strong></span>
+                  </div>
                 </div>
 
-                {/* Lots involved */}
-                <div className="mt-3 pt-2.5 border-t border-white/10">
+                {/* Desglose Exacto Comercial (Ventas) */}
+                <div className="mt-2 rounded-xl border border-amber-500/25 bg-amber-950/25 p-2 space-y-1">
+                  <div className="flex items-center justify-between text-[11px] font-bold text-amber-300">
+                    <span>COMERCIAL (Ventas):</span>
+                    <span className="font-mono">{alert.commercialUnits} und · {formatCOP(alert.commercialCOP)}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1 text-[10px] font-mono text-slate-200">
+                    <span>• Próx: <strong>{alert.causes.proxVencer}</strong></span>
+                    <span>• Venc: <strong>{alert.causes.vencido}</strong></span>
+                    <span>• Cobrar: <strong>{alert.causes.aCobrar}</strong></span>
+                  </div>
+                </div>
+
+                {/* Lots involved (Exact same lot units as in the Table) */}
+                <div className="mt-2.5 pt-2 border-t border-white/10">
                   <div className="text-[10px] uppercase tracking-wider text-slate-400 mb-1.5">
-                    Lotes más afectados:
+                    Lotes afectados (mismos de la tabla):
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {alert.topLots.length > 0 ? (
@@ -668,13 +775,13 @@ export const ProductionEngineeringView: React.FC<
                               selectedLotFilter === l.lot ? 'ALL' : l.lot
                             );
                           }}
-                          className={`rounded-lg px-2 py-0.5 font-mono text-[11px] font-bold border transition-all ${
+                          className={`rounded-lg px-2 py-0.5 font-mono text-[10px] font-bold border transition-all ${
                             selectedLotFilter === l.lot
                               ? 'bg-emerald-500 text-slate-950 border-emerald-300'
                               : 'bg-slate-950 text-emerald-300 border-emerald-500/30 hover:border-emerald-400'
                           }`}
                         >
-                          Lote #{l.lot} ({l.units}u)
+                          L-{l.lot} ({l.units}u)
                         </button>
                       ))
                     ) : (
@@ -682,10 +789,6 @@ export const ProductionEngineeringView: React.FC<
                     )}
                   </div>
                 </div>
-
-                <p className="mt-2.5 text-[11px] text-slate-300 line-clamp-2 leading-relaxed">
-                  {alert.recommendation}
-                </p>
               </div>
             ))}
           </div>
@@ -1369,42 +1472,61 @@ export const ProductionEngineeringView: React.FC<
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="border-b border-white/10 bg-slate-900/90 text-[10px] uppercase tracking-wider text-slate-400">
-                  <th className="py-3 px-4">Producto</th>
-                  <th className="py-3 px-3 text-right">Total Dev.</th>
-                  <th className="py-3 px-3">Causa Principal & %</th>
-                  <th className="py-3 px-2.5 text-center text-violet-300">
-                    Lechoso
+                <tr className="border-b border-white/10 bg-slate-950 text-[10px] uppercase tracking-wider">
+                  <th className="py-2 px-4 text-slate-400" rowSpan={2}>
+                    Producto
                   </th>
-                  <th className="py-3 px-2.5 text-center text-sky-300">
+                  <th
+                    colSpan={5}
+                    className="py-1.5 px-2 text-center border-l border-r border-sky-500/25 bg-sky-950/35 text-sky-300 font-extrabold"
+                  >
+                    CALIDAD (Producción) — Vacío · Lechosidad · X Fecha · Embombamiento
+                  </th>
+                  <th
+                    colSpan={4}
+                    className="py-1.5 px-2 text-center border-r border-amber-500/25 bg-amber-950/35 text-amber-300 font-extrabold"
+                  >
+                    COMERCIAL (Ventas) — Próximo · Vencido · X Cobrar
+                  </th>
+                  <th className="py-2 px-3 text-right text-emerald-300 font-extrabold" rowSpan={2}>
+                    Total Dev.
+                  </th>
+                  <th className="py-2 px-3 text-slate-300" rowSpan={2}>
+                    Lotes Afectados (Mismos del Semáforo)
+                  </th>
+                </tr>
+                <tr className="border-b border-white/10 bg-slate-900/95 text-[10px] uppercase tracking-wider text-slate-300">
+                  <th className="py-2 px-2 text-center border-l border-sky-500/20 text-sky-300">
                     Vacío
                   </th>
-                  <th className="py-3 px-2.5 text-center text-cyan-300">
-                    Fecha / Abom
+                  <th className="py-2 px-2 text-center text-violet-300">
+                    Lechosidad
                   </th>
-                  <th className="py-3 px-2.5 text-center text-amber-300">
-                    Próx. Vencer
+                  <th className="py-2 px-2 text-center text-cyan-300">
+                    X Fecha
                   </th>
-                  <th className="py-3 px-2.5 text-center text-rose-300">
-                    Cobrar / Venc
+                  <th className="py-2 px-2 text-center text-fuchsia-300">
+                    Embomb.
                   </th>
-                  <th className="py-3 px-3">Lotes Afectados (Clic para filtrar)</th>
-                  <th className="py-3 px-4 text-right">Costo Calidad</th>
+                  <th className="py-2 px-2.5 text-right border-r border-sky-500/20 text-sky-200 font-bold">
+                    Total Calidad
+                  </th>
+                  <th className="py-2 px-2 text-center text-amber-300">
+                    Próximo
+                  </th>
+                  <th className="py-2 px-2 text-center text-orange-300">
+                    Vencido
+                  </th>
+                  <th className="py-2 px-2 text-center text-rose-300">
+                    X Cobrar
+                  </th>
+                  <th className="py-2 px-2.5 text-right border-r border-amber-500/20 text-amber-200 font-bold">
+                    Total Comercial
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/10">
                 {productMatrix.map((prod) => {
-                  const dominantMeta =
-                    CAUSE_METADATA.find(
-                      (c) => c.key === prod.dominantCauseKey
-                    ) || CAUSE_METADATA[3];
-                  const pctDominant =
-                    prod.totalUnits > 0
-                      ? Math.round(
-                          (prod.dominantCauseUnits / prod.totalUnits) * 100
-                        )
-                      : 0;
-
                   const topLots = Array.from(prod.lotsMap.values())
                     .sort((a, b) => b.totalUnits - a.totalUnits)
                     .slice(0, 5);
@@ -1425,31 +1547,8 @@ export const ProductionEngineeringView: React.FC<
                         </div>
                       </td>
 
-                      <td className="py-3 px-3 text-right font-mono font-bold text-white">
-                        {formatNumber(prod.totalUnits)} und
-                      </td>
-
-                      <td className="py-3 px-3">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-[10px] font-bold ${dominantMeta.badgeClass}`}
-                          >
-                            {dominantMeta.shortLabel} ({pctDominant}%)
-                          </span>
-                        </div>
-                      </td>
-
-                      <td className="py-3 px-2.5 text-center font-mono">
-                        {prod.causes.lechozo > 0 ? (
-                          <span className="inline-block rounded-md bg-violet-500/20 border border-violet-500/40 px-2 py-0.5 font-bold text-violet-300">
-                            {prod.causes.lechozo}
-                          </span>
-                        ) : (
-                          <span className="text-slate-600">-</span>
-                        )}
-                      </td>
-
-                      <td className="py-3 px-2.5 text-center font-mono">
+                      {/* CALIDAD: Vacío */}
+                      <td className="py-2.5 px-2 text-center font-mono border-l border-sky-500/10">
                         {prod.causes.vacio > 0 ? (
                           <span className="inline-block rounded-md bg-sky-500/20 border border-sky-500/40 px-2 py-0.5 font-bold text-sky-300">
                             {prod.causes.vacio}
@@ -1459,17 +1558,51 @@ export const ProductionEngineeringView: React.FC<
                         )}
                       </td>
 
-                      <td className="py-3 px-2.5 text-center font-mono">
-                        {prod.causes.xFecha + prod.causes.abomba > 0 ? (
-                          <span className="inline-block rounded-md bg-cyan-500/20 border border-cyan-500/40 px-2 py-0.5 font-bold text-cyan-300">
-                            {prod.causes.xFecha + prod.causes.abomba}
+                      {/* CALIDAD: Lechosidad */}
+                      <td className="py-2.5 px-2 text-center font-mono">
+                        {prod.causes.lechozo > 0 ? (
+                          <span className="inline-block rounded-md bg-violet-500/20 border border-violet-500/40 px-2 py-0.5 font-bold text-violet-300">
+                            {prod.causes.lechozo}
                           </span>
                         ) : (
                           <span className="text-slate-600">-</span>
                         )}
                       </td>
 
-                      <td className="py-3 px-2.5 text-center font-mono">
+                      {/* CALIDAD: X Fecha */}
+                      <td className="py-2.5 px-2 text-center font-mono">
+                        {prod.causes.xFecha > 0 ? (
+                          <span className="inline-block rounded-md bg-cyan-500/20 border border-cyan-500/40 px-2 py-0.5 font-bold text-cyan-300">
+                            {prod.causes.xFecha}
+                          </span>
+                        ) : (
+                          <span className="text-slate-600">-</span>
+                        )}
+                      </td>
+
+                      {/* CALIDAD: Embombamiento */}
+                      <td className="py-2.5 px-2 text-center font-mono">
+                        {prod.causes.abomba > 0 ? (
+                          <span className="inline-block rounded-md bg-fuchsia-500/20 border border-fuchsia-500/40 px-2 py-0.5 font-bold text-fuchsia-300">
+                            {prod.causes.abomba}
+                          </span>
+                        ) : (
+                          <span className="text-slate-600">-</span>
+                        )}
+                      </td>
+
+                      {/* Subtotal CALIDAD */}
+                      <td className="py-2.5 px-2.5 text-right font-mono border-r border-sky-500/10 bg-sky-950/15">
+                        <div className="font-extrabold text-sky-300">
+                          {formatNumber(prod.qualityUnits)} und
+                        </div>
+                        <div className="text-[10px] text-slate-400">
+                          {formatCOP(prod.qualityCOP)}
+                        </div>
+                      </td>
+
+                      {/* COMERCIAL: Próximo */}
+                      <td className="py-2.5 px-2 text-center font-mono">
                         {prod.causes.proxVencer > 0 ? (
                           <span className="inline-block rounded-md bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 font-semibold text-amber-300">
                             {prod.causes.proxVencer}
@@ -1479,18 +1612,51 @@ export const ProductionEngineeringView: React.FC<
                         )}
                       </td>
 
-                      <td className="py-3 px-2.5 text-center font-mono">
-                        {prod.causes.aCobrar + prod.causes.vencido > 0 ? (
-                          <span className="inline-block rounded-md bg-rose-500/15 border border-rose-500/30 px-2 py-0.5 font-semibold text-rose-300">
-                            {prod.causes.aCobrar + prod.causes.vencido}
+                      {/* COMERCIAL: Vencido */}
+                      <td className="py-2.5 px-2 text-center font-mono">
+                        {prod.causes.vencido > 0 ? (
+                          <span className="inline-block rounded-md bg-orange-500/15 border border-orange-500/30 px-2 py-0.5 font-semibold text-orange-300">
+                            {prod.causes.vencido}
                           </span>
                         ) : (
                           <span className="text-slate-600">-</span>
                         )}
                       </td>
 
+                      {/* COMERCIAL: X Cobrar */}
+                      <td className="py-2.5 px-2 text-center font-mono">
+                        {prod.causes.aCobrar > 0 ? (
+                          <span className="inline-block rounded-md bg-rose-500/15 border border-rose-500/30 px-2 py-0.5 font-semibold text-rose-300">
+                            {prod.causes.aCobrar}
+                          </span>
+                        ) : (
+                          <span className="text-slate-600">-</span>
+                        )}
+                      </td>
+
+                      {/* Subtotal COMERCIAL */}
+                      <td className="py-2.5 px-2.5 text-right font-mono border-r border-amber-500/10 bg-amber-950/15">
+                        <div className="font-extrabold text-amber-300">
+                          {formatNumber(prod.commercialUnits)} und
+                        </div>
+                        <div className="text-[10px] text-slate-400">
+                          {formatCOP(prod.commercialCOP)}
+                        </div>
+                      </td>
+
+                      {/* TOTAL DEVUELTO (Calidad + Comercial) */}
+                      <td className="py-2.5 px-3 text-right font-mono">
+                        <div className="font-extrabold text-white">
+                          {formatNumber(prod.totalUnits)} und
+                        </div>
+                        <div className="text-[10px] text-emerald-300 font-semibold">
+                          {formatCOP(prod.totalCOP)}
+                        </div>
+                      </td>
+
+                      {/* LOTES AFECTADOS */}
                       <td
-                        className="py-3 px-3"
+                        className="py-2.5 px-3"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <div className="flex flex-wrap gap-1">
@@ -1518,15 +1684,6 @@ export const ProductionEngineeringView: React.FC<
                               S/L
                             </span>
                           )}
-                        </div>
-                      </td>
-
-                      <td className="py-3 px-4 text-right font-mono">
-                        <div className="font-bold text-sky-300">
-                          {formatCOP(prod.qualityCOP)}
-                        </div>
-                        <div className="text-[10px] text-slate-400">
-                          Total: {formatCOP(prod.totalCOP)}
                         </div>
                       </td>
                     </tr>
