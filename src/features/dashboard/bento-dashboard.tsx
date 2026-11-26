@@ -1054,26 +1054,52 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
               <tr className="border-b border-neutral-200/70 dark:border-white/10 bg-neutral-100/70 dark:bg-slate-950/70 text-[10px] font-semibold uppercase tracking-wider text-neutral-600 dark:text-slate-300">
                 <th className="py-2.5 pl-4 pr-2">#</th>
                 <th className="px-2.5 py-2.5">Producto / Referencia</th>
-                <th className="px-2 py-2.5 text-center text-amber-300" title="Próximo a Vencer">Próx.</th>
-                <th className="px-2 py-2.5 text-center text-orange-300" title="Vencido">Venc.</th>
-                <th className="px-2 py-2.5 text-center text-rose-300" title="X Cobrar">Cobrar</th>
-                <th className="px-2.5 py-2.5 text-right text-amber-600 dark:text-amber-300 font-bold">
-                  Total Comercial
+                {(escalafonCategory === 'ALL' ||
+                  escalafonCategory === 'COMERCIAL') && (
+                  <>
+                    <th className="px-2 py-2.5 text-center text-amber-300" title="Próximo a Vencer">Próx.</th>
+                    <th className="px-2 py-2.5 text-center text-orange-300" title="Vencido">Venc.</th>
+                    <th className="px-2 py-2.5 text-center text-rose-300" title="X Cobrar">Cobrar</th>
+                    <th className="px-2.5 py-2.5 text-right text-amber-600 dark:text-amber-300 font-bold">
+                      Total Comercial
+                    </th>
+                  </>
+                )}
+                {(escalafonCategory === 'ALL' ||
+                  escalafonCategory === 'CALIDAD') && (
+                  <>
+                    <th className="px-2 py-2.5 text-center text-sky-300" title="Vacío">Vacío</th>
+                    <th className="px-2 py-2.5 text-center text-violet-300" title="Lechosidad">Lechos.</th>
+                    <th className="px-2 py-2.5 text-center text-cyan-300" title="X Fecha">X Fecha</th>
+                    <th className="px-2 py-2.5 text-center text-fuchsia-300" title="Embombamiento">Embomb.</th>
+                    <th className="px-2.5 py-2.5 text-right text-sky-600 dark:text-sky-300 font-bold">
+                      Total Calidad
+                    </th>
+                  </>
+                )}
+                <th className="px-2.5 py-2.5 text-right font-extrabold">
+                  Total Dev. {escalafonCategory !== 'ALL' ? `(${escalafonCategory})` : ''}
                 </th>
-                <th className="px-2 py-2.5 text-center text-sky-300" title="Vacío">Vacío</th>
-                <th className="px-2 py-2.5 text-center text-violet-300" title="Lechosidad">Lechos.</th>
-                <th className="px-2 py-2.5 text-center text-cyan-300" title="X Fecha">X Fecha</th>
-                <th className="px-2 py-2.5 text-center text-fuchsia-300" title="Embombamiento">Embomb.</th>
-                <th className="px-2.5 py-2.5 text-right text-sky-600 dark:text-sky-300 font-bold">
-                  Total Calidad
-                </th>
-                <th className="px-2.5 py-2.5 text-right font-extrabold">Total Dev.</th>
                 <th className="py-2.5 pl-2.5 pr-4">Acción Correctiva</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-200/50 dark:divide-white/[0.07] text-xs">
               {productEscalafonData.sorted.map((prod, idx) => {
+                const displayTotalUnits =
+                  escalafonCategory === 'COMERCIAL'
+                    ? prod.commercialUnits
+                    : escalafonCategory === 'CALIDAD'
+                    ? prod.qualityUnits
+                    : prod.totalUnits;
+                const displayTotalCOP =
+                  escalafonCategory === 'COMERCIAL'
+                    ? prod.commercialCOP
+                    : escalafonCategory === 'CALIDAD'
+                    ? prod.qualityCOP
+                    : prod.totalCOP;
+
                 const actionLabel =
+                  escalafonCategory === 'COMERCIAL' ||
                   prod.commercialUnits > prod.qualityUnits
                     ? '📉 Bajar inventario en ruta'
                     : prod.lechozoUnits >= prod.vacioUnits && prod.lechozoUnits > 0
@@ -1099,49 +1125,59 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
                         {Array.from(prod.lots).slice(0, 4).join(', ') || 'S/L'}
                       </div>
                     </td>
-                    <td className="px-2 py-2 text-center font-mono text-amber-300">
-                      {prod.proxVencerOnlyUnits || '—'}
-                    </td>
-                    <td className="px-2 py-2 text-center font-mono text-orange-300">
-                      {prod.vencidoUnits || '—'}
-                    </td>
-                    <td className="px-2 py-2 text-center font-mono text-rose-300">
-                      {prod.aCobrarUnits || '—'}
-                    </td>
-                    <td className="px-2.5 py-2 text-right font-mono bg-amber-950/15">
-                      <span className="font-bold text-amber-600 dark:text-amber-300">
-                        {formatNumber(prod.commercialUnits)} u
-                      </span>
-                      <div className="text-[10px] text-neutral-500 dark:text-slate-400">
-                        {formatCOP(prod.commercialCOP)}
-                      </div>
-                    </td>
-                    <td className="px-2 py-2 text-center font-mono text-sky-300">
-                      {prod.vacioUnits || '—'}
-                    </td>
-                    <td className="px-2 py-2 text-center font-mono text-violet-300">
-                      {prod.lechozoUnits || '—'}
-                    </td>
-                    <td className="px-2 py-2 text-center font-mono text-cyan-300">
-                      {prod.xFechaUnits || '—'}
-                    </td>
-                    <td className="px-2 py-2 text-center font-mono text-fuchsia-300">
-                      {prod.abombaUnits || '—'}
-                    </td>
-                    <td className="px-2.5 py-2 text-right font-mono bg-sky-950/15">
-                      <span className="font-bold text-sky-600 dark:text-sky-300">
-                        {formatNumber(prod.qualityUnits)} u
-                      </span>
-                      <div className="text-[10px] text-neutral-500 dark:text-slate-400">
-                        {formatCOP(prod.qualityCOP)}
-                      </div>
-                    </td>
+                    {(escalafonCategory === 'ALL' ||
+                      escalafonCategory === 'COMERCIAL') && (
+                      <>
+                        <td className="px-2 py-2 text-center font-mono text-amber-300">
+                          {prod.proxVencerOnlyUnits || '—'}
+                        </td>
+                        <td className="px-2 py-2 text-center font-mono text-orange-300">
+                          {prod.vencidoUnits || '—'}
+                        </td>
+                        <td className="px-2 py-2 text-center font-mono text-rose-300">
+                          {prod.aCobrarUnits || '—'}
+                        </td>
+                        <td className="px-2.5 py-2 text-right font-mono bg-amber-950/15">
+                          <span className="font-bold text-amber-600 dark:text-amber-300">
+                            {formatNumber(prod.commercialUnits)} u
+                          </span>
+                          <div className="text-[10px] text-neutral-500 dark:text-slate-400">
+                            {formatCOP(prod.commercialCOP)}
+                          </div>
+                        </td>
+                      </>
+                    )}
+                    {(escalafonCategory === 'ALL' ||
+                      escalafonCategory === 'CALIDAD') && (
+                      <>
+                        <td className="px-2 py-2 text-center font-mono text-sky-300">
+                          {prod.vacioUnits || '—'}
+                        </td>
+                        <td className="px-2 py-2 text-center font-mono text-violet-300">
+                          {prod.lechozoUnits || '—'}
+                        </td>
+                        <td className="px-2 py-2 text-center font-mono text-cyan-300">
+                          {prod.xFechaUnits || '—'}
+                        </td>
+                        <td className="px-2 py-2 text-center font-mono text-fuchsia-300">
+                          {prod.abombaUnits || '—'}
+                        </td>
+                        <td className="px-2.5 py-2 text-right font-mono bg-sky-950/15">
+                          <span className="font-bold text-sky-600 dark:text-sky-300">
+                            {formatNumber(prod.qualityUnits)} u
+                          </span>
+                          <div className="text-[10px] text-neutral-500 dark:text-slate-400">
+                            {formatCOP(prod.qualityCOP)}
+                          </div>
+                        </td>
+                      </>
+                    )}
                     <td className="px-2.5 py-2 text-right font-mono">
                       <div className="font-bold text-neutral-900 dark:text-white">
-                        {formatNumber(prod.totalUnits)} u
+                        {formatNumber(displayTotalUnits)} u
                       </div>
                       <div className="text-[10px] text-emerald-400">
-                        {formatCOP(prod.totalCOP)}
+                        {formatCOP(displayTotalCOP)}
                       </div>
                     </td>
                     <td className="py-2 pl-2.5 pr-4 text-[11px] text-neutral-700 dark:text-slate-200">
