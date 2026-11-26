@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { Toaster, toast } from 'sonner';
 import {
   LayoutGrid,
@@ -112,7 +111,7 @@ export const NATURE_FARM_CAROUSEL: LandscapeSlide[] = [
 export function App() {
   const [darkMode, setDarkMode] = useState(true);
   const [slideIndex, setSlideIndex] = useState<number>(0);
-  const [isCarouselPlaying, setIsCarouselPlaying] = useState<boolean>(true);
+  const [isCarouselPlaying, setIsCarouselPlaying] = useState<boolean>(false);
   const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [isExcelModalOpen, setIsExcelModalOpen] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
@@ -602,25 +601,18 @@ export function App() {
           : 'relative min-h-screen text-neutral-900'
       }
     >
-      {/* Dynamic Fullscreen Background Carousel of Nature, Farms & Landscapes */}
-      <div className="fixed inset-0 -z-10 overflow-hidden bg-slate-950">
-        <AnimatePresence mode="popLayout">
-          <motion.img
-            key={currentSlide.id}
-            src={currentSlide.imageUrl}
-            alt={currentSlide.label}
-            initial={{ opacity: 0, scale: 1.08 }}
-            animate={{ opacity: 1, scale: 1.02 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 1.6, ease: 'easeInOut' }}
-            className="absolute inset-0 h-full w-full object-cover object-center"
-          />
-        </AnimatePresence>
+      {/* Dynamic Fullscreen Background Carousel of Nature, Farms & Landscapes (GPU-optimized, zero blur filter lag) */}
+      <div className="fixed inset-0 -z-10 overflow-hidden bg-slate-950 pointer-events-none">
+        <img
+          src={currentSlide.imageUrl}
+          alt={currentSlide.label}
+          className="absolute inset-0 h-full w-full object-cover object-center transition-opacity duration-500"
+        />
         <div
-          className={`absolute inset-0 transition-colors duration-700 ${
+          className={`absolute inset-0 ${
             darkMode
-              ? currentSlide.overlayClass
-              : 'bg-gradient-to-br from-white/80 via-emerald-50/75 to-sky-100/70 backdrop-blur-[3px]'
+              ? 'bg-gradient-to-br from-slate-950/88 via-slate-900/82 to-emerald-950/85'
+              : 'bg-gradient-to-br from-white/88 via-emerald-50/85 to-sky-100/82'
           }`}
         />
       </div>

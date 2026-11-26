@@ -74,6 +74,7 @@ export const ProductionEngineeringView: React.FC<
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'MATRIX' | 'DETAIL'>('MATRIX');
   const [chartBarMode, setChartBarMode] = useState<'LOTS' | 'DATES'>('LOTS');
+  const [detailLimit, setDetailLimit] = useState<number>(100);
   const semaforoScrollRef = useRef<HTMLDivElement | null>(null);
 
   const showCalidadGroup =
@@ -1872,7 +1873,7 @@ export const ProductionEngineeringView: React.FC<
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/10">
-                {filteredRows.map((row) => {
+                {filteredRows.slice(0, detailLimit).map((row) => {
                   const causeMeta =
                     CAUSE_METADATA.find(
                       (c) => c.key === row.primaryCauseKey
@@ -1925,6 +1926,28 @@ export const ProductionEngineeringView: React.FC<
               </tbody>
             </table>
           </div>
+          {filteredRows.length > detailLimit && (
+            <div className="flex flex-wrap items-center justify-center gap-3 border-t border-white/10 bg-slate-950 px-4 py-3 text-xs">
+              <span className="text-slate-300">
+                Mostrando <strong>{Math.min(detailLimit, filteredRows.length)}</strong> de{' '}
+                <strong>{filteredRows.length}</strong> registros
+              </span>
+              <button
+                type="button"
+                onClick={() => setDetailLimit((prev) => prev + 150)}
+                className="rounded-xl bg-emerald-600 hover:bg-emerald-500 px-3.5 py-1.5 font-semibold text-white transition-colors"
+              >
+                Cargar 150 más
+              </button>
+              <button
+                type="button"
+                onClick={() => setDetailLimit(filteredRows.length)}
+                className="rounded-xl border border-white/15 bg-slate-900 hover:bg-slate-800 px-3.5 py-1.5 font-medium text-slate-200 transition-colors"
+              >
+                Ver todos ({filteredRows.length})
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

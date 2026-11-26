@@ -131,6 +131,7 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
   onOpenExcelModal,
 }) => {
   const [isLoadingZone, setIsLoadingZone] = useState(false);
+  const [visibleLimit, setVisibleLimit] = useState<number>(80);
   const [showHiddenMoneyCols, setShowHiddenMoneyCols] = useState(false);
   const [forceTableOnMobile, setForceTableOnMobile] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -289,11 +290,8 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
 
   const handleSelectZone = (newZoneId: string) => {
     if (newZoneId === selectedZoneId) return;
-    setIsLoadingZone(true);
+    setVisibleLimit(80);
     onChangeZoneId(newZoneId);
-    setTimeout(() => {
-      setIsLoadingZone(false);
-    }, 280);
   };
 
   useEffect(() => {
@@ -403,6 +401,25 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
     statusFilter,
     searchQuery,
   ]);
+
+  // Reset visible limit when filters change for ultra-fast rendering
+  useEffect(() => {
+    setVisibleLimit(80);
+  }, [
+    selectedZoneId,
+    searchAllZonesForLot,
+    dateFrom,
+    dateTo,
+    lotFilter,
+    causeFilter,
+    statusFilter,
+    searchQuery,
+  ]);
+
+  const visibleZoneRows = useMemo(
+    () => zoneRows.slice(0, visibleLimit),
+    [zoneRows, visibleLimit]
+  );
 
   const inspectedRow = useMemo(
     () => returnRows.find((r) => r.id === inspectedRowId) || null,
@@ -1428,7 +1445,7 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
                 forceTableOnMobile ? 'hidden' : 'block md:hidden'
               } divide-y divide-neutral-200/60 dark:divide-white/10`}
             >
-              {zoneRows.map((row) => {
+              {visibleZoneRows.map((row) => {
                 const primaryMeta = CAUSE_METADATA.find(
                   (m) => m.key === row.primaryCauseKey
                 );
@@ -1608,7 +1625,7 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-200/60 dark:divide-white/[0.08] text-xs">
-                  {zoneRows.map((row) => {
+                  {visibleZoneRows.map((row) => {
                     const primaryMeta = CAUSE_METADATA.find(
                       (m) => m.key === row.primaryCauseKey
                     );
@@ -1785,6 +1802,29 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
                 </tfoot>
               </table>
             </div>
+
+            {zoneRows.length > visibleLimit && (
+              <div className="flex flex-wrap items-center justify-center gap-3 border-t border-neutral-200/70 dark:border-white/10 bg-slate-950/50 px-4 py-3 text-xs">
+                <span className="text-slate-300">
+                  Mostrando <strong>{visibleZoneRows.length}</strong> de{' '}
+                  <strong>{zoneRows.length}</strong> registros para máxima fluidez
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setVisibleLimit((prev) => prev + 120)}
+                  className="rounded-xl bg-indigo-600 hover:bg-indigo-500 px-3.5 py-1.5 font-semibold text-white transition-colors"
+                >
+                  Cargar 120 más
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVisibleLimit(zoneRows.length)}
+                  className="rounded-xl border border-white/15 bg-slate-900 hover:bg-slate-800 px-3.5 py-1.5 font-medium text-slate-200 transition-colors"
+                >
+                  Ver todos ({zoneRows.length})
+                </button>
+              </div>
+            )}
           </>
         )}
       </BentoCard>
