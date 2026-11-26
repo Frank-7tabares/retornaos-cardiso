@@ -1191,40 +1191,43 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
         </div>
       </BentoCard>
 
-      {/* Row 2: Main Bento Grid (8 Cols Consolidated Matrix + 4 Cols Cause & Lot Intelligence) */}
+      {/* Row 2: Matriz Consolidada Full Width (12 Cols) + 2-Col Diagnostic Grid Below */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-        {/* Left 8 Cols: Matriz Consolidada % DE VENTAS */}
-        <BentoCard noPadding className="lg:col-span-8 flex flex-col">
-          <div className="flex flex-col gap-3 border-b border-neutral-200/70 dark:border-white/10 p-5 sm:flex-row sm:items-center sm:justify-between">
+        {/* Full 12 Cols: Matriz Consolidada % DE VENTAS */}
+        <BentoCard noPadding className="lg:col-span-12 flex flex-col overflow-hidden">
+          <div className="flex flex-col gap-3 border-b border-neutral-200/70 dark:border-white/10 p-5 lg:flex-row lg:items-center lg:justify-between bg-slate-950/35">
             <div>
-              <div className="flex items-center gap-2">
-                  <h2 className="text-base font-semibold text-neutral-900 dark:text-white">
-                    Matriz Consolidada por Zona Comercial (Z01–Z16, Z14 y Puntos de Venta)
-                  </h2>
-                  <Badge variant="success">Control por Zonas</Badge>
-                </div>
-                <p className="mt-0.5 text-xs text-neutral-600 dark:text-slate-300">
-                  Haz clic en cualquier fila para abrir las devoluciones de esa Zona o edita sus Ventas del Mes.
-                </p>
+              <div className="flex flex-wrap items-center gap-2.5">
+                <h2 className="text-base sm:text-lg font-bold text-neutral-900 dark:text-white tracking-tight">
+                  Matriz Consolidada por Zona Comercial (Z01–Z16, Z14 y Puntos de Venta)
+                </h2>
+                <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-500/35 bg-emerald-500/15 px-3 py-0.5 text-xs font-semibold text-emerald-300 whitespace-nowrap">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                  Control por Zonas ({filteredZones.length})
+                </span>
               </div>
+              <p className="mt-1 text-xs text-neutral-600 dark:text-slate-300">
+                Haz clic en cualquier fila para abrir las devoluciones de esa Zona o edita sus Ventas del Mes. Comercial + Calidad = Total Dev.
+              </p>
+            </div>
 
-              <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 w-full sm:w-auto">
-                <div className="relative w-full sm:w-auto">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-neutral-400" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Buscar por código de zona..."
-                  className="w-full sm:w-48 rounded-xl border border-neutral-300 dark:border-white/15 bg-white/80 dark:bg-slate-950/60 pl-8 pr-3 py-1.5 text-xs text-neutral-900 dark:text-white placeholder:text-neutral-400 focus:border-indigo-500 focus:outline-none"
+            <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2.5 w-full lg:w-auto shrink-0">
+              <div className="relative w-full sm:w-56">
+                <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-neutral-400" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Buscar por código de zona..."
+                  className="w-full rounded-xl border border-neutral-300 dark:border-white/15 bg-white/80 dark:bg-slate-950/75 pl-8 pr-3 py-1.5 text-xs text-neutral-900 dark:text-white placeholder:text-neutral-400 focus:border-indigo-500 focus:outline-none"
                 />
               </div>
 
-              <div className="inline-flex rounded-xl border border-neutral-300 dark:border-white/15 bg-neutral-100/80 dark:bg-slate-950/70 p-0.5">
+              <div className="inline-flex rounded-xl border border-neutral-300 dark:border-white/15 bg-neutral-100/80 dark:bg-slate-950/80 p-0.5">
                 <button
                   type="button"
                   onClick={() => setMetricMode('COP')}
-                  className={`flex-1 sm:flex-initial justify-center inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium transition-all ${
+                  className={`flex-1 sm:flex-initial justify-center inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all whitespace-nowrap ${
                     metricMode === 'COP'
                       ? 'bg-indigo-600 text-white shadow-sm'
                       : 'text-neutral-600 dark:text-slate-300 hover:text-neutral-900 dark:hover:text-white'
@@ -1236,7 +1239,7 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
                 <button
                   type="button"
                   onClick={() => setMetricMode('UNITS')}
-                  className={`flex-1 sm:flex-initial justify-center inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium transition-all ${
+                  className={`flex-1 sm:flex-initial justify-center inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all whitespace-nowrap ${
                     metricMode === 'UNITS'
                       ? 'bg-indigo-600 text-white shadow-sm'
                       : 'text-neutral-600 dark:text-slate-300 hover:text-neutral-900 dark:hover:text-white'
@@ -1340,174 +1343,176 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
 
               {/* Desktop Table (hidden md:block) */}
               <div className="hidden md:block overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-neutral-200/70 dark:border-white/10 bg-neutral-100/60 dark:bg-slate-950/40 text-[11px] font-semibold uppercase tracking-wider text-neutral-600 dark:text-slate-300">
-                    <th className="py-3 pl-5 pr-3">Zona / Titular</th>
-                    <th className="px-2.5 py-3 text-right">Ventas Mes</th>
-                    <th className="px-2.5 py-3 text-right text-amber-600 dark:text-amber-300">
-                      Comercial ({metricMode === 'COP' ? '$' : 'Und'})
-                    </th>
-                    <th className="px-2 py-3 text-right text-amber-600 dark:text-amber-300">
-                      % Come
-                    </th>
-                    <th className="px-2.5 py-3 text-right text-sky-600 dark:text-sky-300">
-                      Calidad ({metricMode === 'COP' ? '$' : 'Und'})
-                    </th>
-                    <th className="px-2 py-3 text-right text-sky-600 dark:text-sky-300">
-                      % Calid
-                    </th>
-                    <th className="px-2.5 py-3 text-right">
-                      Total Dev ({metricMode === 'COP' ? '$' : 'Und'})
-                    </th>
-                    <th className="py-3 pl-2 pr-5 text-right">% Total</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-neutral-200/50 dark:divide-white/[0.07] text-xs">
-                  {filteredZones.map((z) => {
-                    const hasSheetNameMismatch =
-                      z.sheetName.trim().toLowerCase() !==
-                      z.consolidatedName.trim().toLowerCase();
+                <table className="w-full text-left border-collapse table-auto">
+                  <thead>
+                    <tr className="border-b border-neutral-200/70 dark:border-white/15 bg-neutral-100/70 dark:bg-slate-950/70 text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-slate-300 whitespace-nowrap">
+                      <th className="py-3.5 pl-6 pr-4">Zona Comercial</th>
+                      <th className="px-4 py-3.5 text-right">Ventas Mes</th>
+                      <th className="px-4 py-3.5 text-right text-amber-600 dark:text-amber-300 bg-amber-500/[0.04]">
+                        Comercial ({metricMode === 'COP' ? '$' : 'Und'})
+                      </th>
+                      <th className="px-3 py-3.5 text-right text-amber-600 dark:text-amber-300 bg-amber-500/[0.04]">
+                        % Come
+                      </th>
+                      <th className="px-4 py-3.5 text-right text-sky-600 dark:text-sky-300 bg-sky-500/[0.04]">
+                        Calidad ({metricMode === 'COP' ? '$' : 'Und'})
+                      </th>
+                      <th className="px-3 py-3.5 text-right text-sky-600 dark:text-sky-300 bg-sky-500/[0.04]">
+                        % Calid
+                      </th>
+                      <th className="px-4 py-3.5 text-right text-emerald-600 dark:text-emerald-300 bg-emerald-500/[0.04]">
+                        Total Dev ({metricMode === 'COP' ? '$' : 'Und'})
+                      </th>
+                      <th className="py-3.5 pl-3 pr-6 text-right bg-emerald-500/[0.04]">
+                        % Total
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-neutral-200/50 dark:divide-white/[0.08] text-xs">
+                    {filteredZones.map((z) => {
+                      const hasSheetNameMismatch =
+                        z.sheetName.trim().toLowerCase() !==
+                        z.consolidatedName.trim().toLowerCase();
 
-                    return (
-                      <tr
-                        key={z.id}
-                        onClick={() => onSelectZone(z.id)}
-                        className="group hover:bg-indigo-500/10 dark:hover:bg-white/[0.06] cursor-pointer transition-colors"
-                      >
-                        <td className="py-3 pl-5 pr-3">
-                          <div className="flex items-center gap-2.5">
-                            <span className="inline-flex h-7 w-14 shrink-0 items-center justify-center rounded-lg border border-neutral-300 dark:border-white/15 bg-white/80 dark:bg-slate-950/70 font-mono text-[11px] font-semibold text-indigo-600 dark:text-indigo-300 group-hover:border-indigo-400 transition-colors">
-                              {z.code}
-                            </span>
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-1.5 font-medium text-neutral-900 dark:text-white truncate">
-                                <span>{z.consolidatedName}</span>
-                                <ArrowUpRight className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 text-indigo-400 transition-opacity" />
-                              </div>
-                              <div className="text-[11px] text-neutral-500 dark:text-slate-400 truncate flex items-center gap-1.5">
-                                <span>{z.lineItemsCount} registros</span>
-                                {hasSheetNameMismatch && (
-                                  <span className="text-amber-600 dark:text-amber-300/90">
-                                    · Pestaña Excel: {z.sheetName}
-                                  </span>
-                                )}
+                      return (
+                        <tr
+                          key={z.id}
+                          onClick={() => onSelectZone(z.id)}
+                          className="group hover:bg-indigo-500/10 dark:hover:bg-white/[0.06] cursor-pointer transition-colors whitespace-nowrap"
+                        >
+                          <td className="py-3.5 pl-6 pr-4">
+                            <div className="flex items-center gap-3">
+                              <span className="inline-flex h-8 w-16 shrink-0 items-center justify-center rounded-xl border border-indigo-500/30 bg-indigo-500/10 dark:bg-slate-950/80 font-mono text-xs font-bold text-indigo-600 dark:text-indigo-300 group-hover:border-indigo-400 group-hover:bg-indigo-500/20 transition-colors">
+                                {z.code}
+                              </span>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5 font-bold text-neutral-900 dark:text-white">
+                                  <span>{z.consolidatedName}</span>
+                                  <ArrowUpRight className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 text-indigo-400 transition-opacity" />
+                                </div>
+                                <div className="text-[11px] text-neutral-500 dark:text-slate-400 flex items-center gap-1.5">
+                                  <span>{z.lineItemsCount} registros</span>
+                                  {hasSheetNameMismatch && (
+                                    <span className="text-amber-600 dark:text-amber-300/90">
+                                      · Pestaña Excel: {z.sheetName}
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        </td>
+                          </td>
 
-                        <td className="px-2.5 py-3 text-right font-mono text-neutral-700 dark:text-slate-200">
-                          <button
-                            type="button"
-                            onClick={(e) => openEditSales(z, e)}
-                            title="Editar Ventas Mes de esta zona"
-                            className="inline-flex items-center gap-1 rounded-lg px-1.5 py-0.5 hover:bg-neutral-200/70 dark:hover:bg-white/10 text-right transition-colors"
-                          >
-                            <span>{formatCompactCOP(z.monthlySalesCOP)}</span>
-                            <Pencil className="h-2.5 w-2.5 text-slate-400 opacity-0 group-hover:opacity-100" />
-                          </button>
-                        </td>
-
-                        <td className="px-2.5 py-3 text-right font-mono font-medium text-amber-600 dark:text-amber-300">
-                          {metricMode === 'COP'
-                            ? formatCOP(z.commercialCOP)
-                            : formatNumber(z.commercialUnits)}
-                        </td>
-
-                        <td className="px-2 py-3 text-right font-mono text-[11px] text-neutral-500 dark:text-slate-400">
-                          {formatPercent(z.pctCommercialOverSales)}
-                        </td>
-
-                        <td className="px-2.5 py-3 text-right font-mono font-medium text-sky-600 dark:text-sky-300">
-                          {metricMode === 'COP'
-                            ? formatCOP(z.qualityCOP)
-                            : formatNumber(z.qualityUnits)}
-                        </td>
-
-                        <td className="px-2 py-3 text-right font-mono text-[11px] text-neutral-500 dark:text-slate-400">
-                          {formatPercent(z.pctQualityOverSales)}
-                        </td>
-
-                        <td className="px-2.5 py-3 text-right font-mono font-semibold text-neutral-900 dark:text-white">
-                          {metricMode === 'COP'
-                            ? formatCOP(z.totalCOP)
-                            : `${formatNumber(z.totalUnits)} und`}
-                        </td>
-
-                        <td className="py-3 pl-2 pr-5 text-right">
-                          {z.totalCOP === 0 ? (
-                            <Badge variant="neutral">0.00%</Badge>
-                          ) : (
-                            <Badge
-                              variant={
-                                z.pctTotalOverSales > 8
-                                  ? 'danger'
-                                  : z.pctTotalOverSales > 5
-                                  ? 'warning'
-                                  : 'success'
-                              }
+                          <td className="px-4 py-3.5 text-right font-mono font-semibold text-neutral-700 dark:text-slate-200">
+                            <button
+                              type="button"
+                              onClick={(e) => openEditSales(z, e)}
+                              title="Editar Ventas Mes de esta zona"
+                              className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 hover:bg-neutral-200/70 dark:hover:bg-white/10 text-right transition-colors"
                             >
-                              {formatPercent(z.pctTotalOverSales)}
-                            </Badge>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-                <tfoot>
-                  <tr className="border-t-2 border-neutral-300 dark:border-white/20 bg-neutral-100/90 dark:bg-slate-950/80 font-mono text-xs font-bold text-neutral-900 dark:text-white">
-                    <td className="py-3.5 pl-5 pr-3 font-sans">
-                      SUBTOTAL CONSOLIDADO ({filteredZones.length} Zonas)
-                    </td>
-                    <td className="px-2.5 py-3.5 text-right">
-                      {formatCompactCOP(totals.salesCOP)}
-                    </td>
-                    <td className="px-2.5 py-3.5 text-right text-amber-600 dark:text-amber-300">
-                      {metricMode === 'COP'
-                        ? formatCOP(totals.commercialCOP)
-                        : formatNumber(totals.commercialUnits)}
-                    </td>
-                    <td className="px-2 py-3.5 text-right text-amber-600 dark:text-amber-300">
-                      {formatPercent(
-                        totals.salesCOP > 0
-                          ? (totals.commercialCOP / totals.salesCOP) * 100
-                          : 0
-                      )}
-                    </td>
-                    <td className="px-2.5 py-3.5 text-right text-sky-600 dark:text-sky-300">
-                      {metricMode === 'COP'
-                        ? formatCOP(totals.qualityCOP)
-                        : formatNumber(totals.qualityUnits)}
-                    </td>
-                    <td className="px-2 py-3.5 text-right text-sky-600 dark:text-sky-300">
-                      {formatPercent(
-                        totals.salesCOP > 0
-                          ? (totals.qualityCOP / totals.salesCOP) * 100
-                          : 0
-                      )}
-                    </td>
-                    <td className="px-2.5 py-3.5 text-right">
-                      {metricMode === 'COP'
-                        ? formatCOP(totals.totalCOP)
-                        : `${formatNumber(totals.totalUnits)} und`}
-                    </td>
-                    <td className="py-3.5 pl-2 pr-5 text-right">
-                      <Badge variant="indigo">
-                        {formatPercent(totals.pctTotalOverSales)}
-                      </Badge>
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
+                              <span>{formatCompactCOP(z.monthlySalesCOP)}</span>
+                              <Pencil className="h-3 w-3 text-slate-400 opacity-0 group-hover:opacity-100" />
+                            </button>
+                          </td>
+
+                          <td className="px-4 py-3.5 text-right font-mono font-bold text-amber-600 dark:text-amber-300 bg-amber-500/[0.02]">
+                            {metricMode === 'COP'
+                              ? formatCOP(z.commercialCOP)
+                              : `${formatNumber(z.commercialUnits)} und`}
+                          </td>
+
+                          <td className="px-3 py-3.5 text-right font-mono text-xs font-medium text-amber-600/80 dark:text-amber-200/80 bg-amber-500/[0.02]">
+                            {formatPercent(z.pctCommercialOverSales)}
+                          </td>
+
+                          <td className="px-4 py-3.5 text-right font-mono font-bold text-sky-600 dark:text-sky-300 bg-sky-500/[0.02]">
+                            {metricMode === 'COP'
+                              ? formatCOP(z.qualityCOP)
+                              : `${formatNumber(z.qualityUnits)} und`}
+                          </td>
+
+                          <td className="px-3 py-3.5 text-right font-mono text-xs font-medium text-sky-600/80 dark:text-sky-200/80 bg-sky-500/[0.02]">
+                            {formatPercent(z.pctQualityOverSales)}
+                          </td>
+
+                          <td className="px-4 py-3.5 text-right font-mono font-extrabold text-neutral-900 dark:text-white bg-emerald-500/[0.02]">
+                            {metricMode === 'COP'
+                              ? formatCOP(z.totalCOP)
+                              : `${formatNumber(z.totalUnits)} und`}
+                          </td>
+
+                          <td className="py-3.5 pl-3 pr-6 text-right bg-emerald-500/[0.02]">
+                            {z.totalCOP === 0 ? (
+                              <Badge variant="neutral">0.00%</Badge>
+                            ) : (
+                              <Badge
+                                variant={
+                                  z.pctTotalOverSales > 8
+                                    ? 'danger'
+                                    : z.pctTotalOverSales > 5
+                                    ? 'warning'
+                                    : 'success'
+                                }
+                              >
+                                {formatPercent(z.pctTotalOverSales)}
+                              </Badge>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t-2 border-neutral-300 dark:border-white/20 bg-neutral-100/95 dark:bg-slate-950/90 font-mono text-xs font-extrabold text-neutral-900 dark:text-white whitespace-nowrap">
+                      <td className="py-4 pl-6 pr-4 font-sans">
+                        SUBTOTAL CONSOLIDADO ({filteredZones.length} Zonas)
+                      </td>
+                      <td className="px-4 py-4 text-right">
+                        {formatCompactCOP(totals.salesCOP)}
+                      </td>
+                      <td className="px-4 py-4 text-right text-amber-600 dark:text-amber-300">
+                        {metricMode === 'COP'
+                          ? formatCOP(totals.commercialCOP)
+                          : `${formatNumber(totals.commercialUnits)} und`}
+                      </td>
+                      <td className="px-3 py-4 text-right text-amber-600 dark:text-amber-300">
+                        {formatPercent(
+                          totals.salesCOP > 0
+                            ? (totals.commercialCOP / totals.salesCOP) * 100
+                            : 0
+                        )}
+                      </td>
+                      <td className="px-4 py-4 text-right text-sky-600 dark:text-sky-300">
+                        {metricMode === 'COP'
+                          ? formatCOP(totals.qualityCOP)
+                          : `${formatNumber(totals.qualityUnits)} und`}
+                      </td>
+                      <td className="px-3 py-4 text-right text-sky-600 dark:text-sky-300">
+                        {formatPercent(
+                          totals.salesCOP > 0
+                            ? (totals.qualityCOP / totals.salesCOP) * 100
+                            : 0
+                        )}
+                      </td>
+                      <td className="px-4 py-4 text-right text-emerald-400">
+                        {metricMode === 'COP'
+                          ? formatCOP(totals.totalCOP)
+                          : `${formatNumber(totals.totalUnits)} und`}
+                      </td>
+                      <td className="py-4 pl-3 pr-6 text-right">
+                        <Badge variant="indigo">
+                          {formatPercent(totals.pctTotalOverSales)}
+                        </Badge>
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
               </div>
             </>
           )}
         </BentoCard>
 
-        {/* Right 4 Cols: Interactive 7 Causes Diagnosis + Clickable Lot Radar with Photos */}
-        <div className="lg:col-span-4 space-y-6">
+        {/* Bottom 12 Cols Grid: Interactive 7 Causes Diagnosis + Clickable Lot Radar with Photos */}
+        <div className="lg:col-span-12 grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Interactive Breakdown of the 7 Causes */}
           <BentoCard>
             <div className="flex items-center justify-between mb-3">

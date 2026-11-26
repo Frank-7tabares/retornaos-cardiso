@@ -319,12 +319,19 @@ export function App() {
     setSelectedZoneId(zoneId);
     setExternalLotFilter('ALL');
     setActiveTab('WORKBENCH');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleSelectLotFromDashboard = (lotNumber: string) => {
     setExternalLotFilter(lotNumber);
     setActiveTab('WORKBENCH');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  // Al cambiar de página/pestaña o de zona seleccionada, devolver siempre la vista al inicio
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [activeTab, selectedZoneId]);
 
   const handleUpdateZoneSales = (zoneId: string, newSalesCOP: number) => {
     setZones((prev) =>

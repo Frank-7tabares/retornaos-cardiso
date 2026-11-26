@@ -92,9 +92,27 @@ export const ProductionEngineeringView: React.FC<
     causeFilter === 'aCobrar';
 
   const scrollSemaforo = (dir: 'LEFT' | 'RIGHT') => {
-    if (!semaforoScrollRef.current) return;
-    const offset = dir === 'LEFT' ? -660 : 660;
-    semaforoScrollRef.current.scrollBy({ left: offset, behavior: 'smooth' });
+    const el = semaforoScrollRef.current;
+    if (!el) return;
+    const maxScrollLeft = el.scrollWidth - el.clientWidth;
+
+    if (dir === 'RIGHT') {
+      // Si ya llegó al final (última página), se devuelve automáticamente al inicio (#1)
+      if (el.scrollLeft >= maxScrollLeft - 24) {
+        el.scrollTo({ left: 0, behavior: 'smooth' });
+      } else {
+        const nextLeft = Math.min(maxScrollLeft, el.scrollLeft + el.clientWidth * 0.85);
+        el.scrollTo({ left: nextLeft, behavior: 'smooth' });
+      }
+    } else {
+      // Si está al inicio y da clic en Anterior, va al final
+      if (el.scrollLeft <= 24) {
+        el.scrollTo({ left: maxScrollLeft, behavior: 'smooth' });
+      } else {
+        const prevLeft = Math.max(0, el.scrollLeft - el.clientWidth * 0.85);
+        el.scrollTo({ left: prevLeft, behavior: 'smooth' });
+      }
+    }
   };
 
   // Unique dates present in returnRows
