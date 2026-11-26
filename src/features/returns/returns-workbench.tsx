@@ -144,7 +144,7 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
   const [dateFrom, setDateFrom] = useState<string>('');
   const [dateTo, setDateTo] = useState<string>('');
   const [causeFilter, setCauseFilter] = useState<
-    'ALL' | 'PROX_VENCER_GROUP' | 'CALIDAD_GROUP' | ReturnCauseKey
+    'ALL' | 'COMERCIAL_GROUP' | 'PROX_VENCER_GROUP' | 'CALIDAD_GROUP' | ReturnCauseKey
   >('ALL');
   const [searchAllZonesForLot, setSearchAllZonesForLot] = useState(false);
   const [statusFilter, setStatusFilter] = useState<
@@ -455,24 +455,108 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
     searchQuery,
   ]);
 
+  const isWorkbenchCauseAllowed = (k: ReturnCauseKey): boolean => {
+    if (causeFilter === 'ALL') return true;
+    if (causeFilter === 'COMERCIAL_GROUP') {
+      return k === 'proxVencer' || k === 'vencido' || k === 'aCobrar';
+    }
+    if (causeFilter === 'PROX_VENCER_GROUP') {
+      return k === 'proxVencer' || k === 'vencido';
+    }
+    if (causeFilter === 'CALIDAD_GROUP') {
+      return (
+        k === 'vacio' ||
+        k === 'lechozo' ||
+        k === 'xFecha' ||
+        k === 'abomba'
+      );
+    }
+    return causeFilter === k;
+  };
+
+  const visibleCauseMetadata = useMemo(
+    () => CAUSE_METADATA.filter((c) => isWorkbenchCauseAllowed(c.key)),
+    [causeFilter]
+  );
+
   const zoneRows = useMemo(() => {
-    const filtered = baseZoneRows.filter((r) => {
-      if (causeFilter === 'PROX_VENCER_GROUP') {
-        if (r.causes.proxVencer + r.causes.vencido <= 0) return false;
-      } else if (causeFilter === 'CALIDAD_GROUP') {
-        if (
-          r.causes.vacio +
-            r.causes.lechozo +
-            r.causes.xFecha +
-            r.causes.abomba <=
-          0
-        )
-          return false;
-      } else if (causeFilter !== 'ALL' && r.causes[causeFilter] <= 0) {
-        return false;
+    const filtered: ComputedReturnRow[] = [];
+
+    for (const r of baseZoneRows) {
+      const mACobrar = isWorkbenchCauseAllowed('aCobrar') ? r.causes.aCobrar : 0;
+      const mProxVencer = isWorkbenchCauseAllowed('proxVencer')
+        ? r.causes.proxVencer
+        : 0;
+      const mVencido = isWorkbenchCauseAllowed('vencido') ? r.causes.vencido : 0;
+      const mVacio = isWorkbenchCauseAllowed('vacio') ? r.causes.vacio : 0;
+      const mLechozo = isWorkbenchCauseAllowed('lechozo') ? r.causes.lechozo : 0;
+      const mXFecha = isWorkbenchCauseAllowed('xFecha') ? r.causes.xFecha : 0;
+      const mAbomba = isWorkbenchCauseAllowed('abomba') ? r.causes.abomba : 0;
+
+      const commUnits = mACobrar + mProxVencer + mVencido;
+      const qualUnits = mVacio + mLechozo + mXFecha + mAbomba;
+      const totalClassified = commUnits + qualUnits;
+
+      if (causeFilter !== 'ALL' && totalClassified <= 0) {
+        continue;
       }
-      return true;
-    });
+
+      if (causeFilter === 'ALL') {
+        filtered.push(r);
+      } else {
+        const commCOP =
+          (mACobrar > 0 ? r.copByCause.aCobrar : 0) +
+          (mProxVencer > 0 ? r.copByCause.proxVencer : 0) +
+          (mVencido > 0 ? r.copByCause.vencido : 0);
+        const qualCOP =
+          (mVacio > 0 ? r.copByCause.vacio : 0) +
+          (mLechozo > 0 ? r.copByCause.lechozo : 0) +
+          (mXFecha > 0 ? r.copByCause.xFecha : 0) +
+          (mAbomba > 0 ? r.copByCause.abomba : 0);
+
+        const maskedCauses: Record<ReturnCauseKey, number> = {
+          aCobrar: mACobrar,
+          proxVencer: mProxVencer,
+          vencido: mVencido,
+          vacio: mVacio,
+          lechozo: mLechozo,
+          xFecha: mXFecha,
+          abomba: mAbomba,
+        };
+
+        const maskedCopByCause: Record<ReturnCauseKey, number> = {
+          aCobrar: mACobrar > 0 ? r.copByCause.aCobrar : 0,
+          proxVencer: mProxVencer > 0 ? r.copByCause.proxVencer : 0,
+          vencido: mVencido > 0 ? r.copByCause.vencido : 0,
+          vacio: mVacio > 0 ? r.copByCause.vacio : 0,
+          lechozo: mLechozo > 0 ? r.copByCause.lechozo : 0,
+          xFecha: mXFecha > 0 ? r.copByCause.xFecha : 0,
+          abomba: mAbomba > 0 ? r.copByCause.abomba : 0,
+        };
+
+        // Determine primary cause strictly among the allowed causes
+        let bestKey: ReturnCauseKey = 'proxVencer';
+        let bestVal = -1;
+        (Object.keys(maskedCauses) as ReturnCauseKey[]).forEach((k) => {
+          if (maskedCauses[k] > bestVal) {
+            bestVal = maskedCauses[k];
+            bestKey = k;
+          }
+        });
+
+        filtered.push({
+          ...r,
+          qtyToReceive: totalClassified,
+          totalClassifiedUnits: totalClassified,
+          commercialValueCOP: commCOP,
+          qualityValueCOP: qualCOP,
+          totalValueCOP: commCOP + qualCOP,
+          causes: maskedCauses,
+          copByCause: maskedCopByCause,
+          primaryCauseKey: bestKey,
+        });
+      }
+    }
 
     return [...filtered].sort((a, b) => {
       if (sortOrder === 'DATE_ASC') return a.date.localeCompare(b.date);
@@ -1262,6 +1346,7 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
                 setCauseFilter(
                   e.target.value as
                     | 'ALL'
+                    | 'COMERCIAL_GROUP'
                     | 'PROX_VENCER_GROUP'
                     | 'CALIDAD_GROUP'
                     | ReturnCauseKey
@@ -1269,12 +1354,15 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
               }
               className="w-full sm:w-auto rounded-xl border border-neutral-300 dark:border-white/15 bg-white/90 dark:bg-slate-950/80 px-3 py-1.5 text-xs font-medium text-neutral-900 dark:text-white focus:border-indigo-500 focus:outline-none"
             >
-              <option value="ALL">Todas las 7 Causas (Cols G–M)</option>
+              <option value="ALL">Todas las 7 Causas (Comercial + Calidad)</option>
+              <option value="COMERCIAL_GROUP">
+                🟠 Solo COMERCIAL (Ventas: Próximo + Vencido + X Cobrar)
+              </option>
               <option value="PROX_VENCER_GROUP">
-                Filtro: Próx. a Vencer / Vencido (Comercial)
+                🟠 Comercial: Solo Próximo + Vencido
               </option>
               <option value="CALIDAD_GROUP">
-                Filtro: Calidad Planta (Vacío / Lechoso / Fecha)
+                🔵 Solo CALIDAD (Producción: Vacío + Lechosidad + X Fecha + Embomb.)
               </option>
               {CAUSE_METADATA.map((c) => (
                 <option key={c.key} value={c.key}>
@@ -1900,7 +1988,7 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
                     <th className="px-2 py-3">Producto (C)</th>
                     <th className="px-2 py-3 text-center">Cant. (D)</th>
                     <th className="px-2 py-3 text-center">Lote (E) / Venc (F)</th>
-                    {CAUSE_METADATA.map((c) => (
+                    {visibleCauseMetadata.map((c) => (
                       <th
                         key={c.key}
                         className="px-1.5 py-3 text-center"
@@ -2022,8 +2110,8 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
                           </div>
                         </td>
 
-                        {/* 7 Causes Columns */}
-                        {CAUSE_METADATA.map((c) => {
+                        {/* Filtered Causes Columns (Only shows Comercial columns when filtering Comercial, and only Calidad columns when filtering Calidad) */}
+                        {visibleCauseMetadata.map((c) => {
                           const unitVal = row.causes[c.key];
                           const moneyVal = row.copByCause[c.key];
                           return (
@@ -2113,7 +2201,7 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
                     <td className="px-2 py-3 text-center text-neutral-400">
                       —
                     </td>
-                    {CAUSE_METADATA.map((c) => (
+                    {visibleCauseMetadata.map((c) => (
                       <td key={c.key} className="px-1.5 py-3 text-center">
                         <div>{tableTotals.causes[c.key]}</div>
                         {showHiddenMoneyCols && (

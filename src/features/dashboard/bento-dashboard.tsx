@@ -208,6 +208,37 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
     dashCauseFilter,
   ]);
 
+  const isAdminCauseAllowed = (k: ReturnCauseKey): boolean => {
+    if (dashCauseFilter === 'ALL') return true;
+    if (dashCauseFilter === 'COMERCIAL') {
+      return k === 'proxVencer' || k === 'vencido' || k === 'aCobrar';
+    }
+    if (dashCauseFilter === 'CALIDAD') {
+      return (
+        k === 'vacio' ||
+        k === 'lechozo' ||
+        k === 'xFecha' ||
+        k === 'abomba'
+      );
+    }
+    return dashCauseFilter === k;
+  };
+
+  const showAdminComercialCols =
+    dashCauseFilter === 'ALL' ||
+    dashCauseFilter === 'COMERCIAL' ||
+    dashCauseFilter === 'proxVencer' ||
+    dashCauseFilter === 'vencido' ||
+    dashCauseFilter === 'aCobrar';
+
+  const showAdminCalidadCols =
+    dashCauseFilter === 'ALL' ||
+    dashCauseFilter === 'CALIDAD' ||
+    dashCauseFilter === 'vacio' ||
+    dashCauseFilter === 'lechozo' ||
+    dashCauseFilter === 'xFecha' ||
+    dashCauseFilter === 'abomba';
+
   const enrichedZones = useMemo(() => {
     const activeZones = zones.filter((z) => z.id !== 'Z15');
     return activeZones.map((z) => {
@@ -249,25 +280,38 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
         },
       };
       for (const r of zRows) {
-        customZone.unitsByCause.aCobrar += r.causes.aCobrar;
-        customZone.unitsByCause.xFecha += r.causes.xFecha;
-        customZone.unitsByCause.vacio += r.causes.vacio;
-        customZone.unitsByCause.proxVencer += r.causes.proxVencer;
-        customZone.unitsByCause.vencido += r.causes.vencido;
-        customZone.unitsByCause.abomba += r.causes.abomba;
-        customZone.unitsByCause.lechozo += r.causes.lechozo;
-
-        customZone.copByCause.aCobrar += r.copByCause.aCobrar;
-        customZone.copByCause.xFecha += r.copByCause.xFecha;
-        customZone.copByCause.vacio += r.copByCause.vacio;
-        customZone.copByCause.proxVencer += r.copByCause.proxVencer;
-        customZone.copByCause.vencido += r.copByCause.vencido;
-        customZone.copByCause.abomba += r.copByCause.abomba;
-        customZone.copByCause.lechozo += r.copByCause.lechozo;
+        if (isAdminCauseAllowed('aCobrar')) {
+          customZone.unitsByCause.aCobrar += r.causes.aCobrar;
+          customZone.copByCause.aCobrar += r.copByCause.aCobrar;
+        }
+        if (isAdminCauseAllowed('proxVencer')) {
+          customZone.unitsByCause.proxVencer += r.causes.proxVencer;
+          customZone.copByCause.proxVencer += r.copByCause.proxVencer;
+        }
+        if (isAdminCauseAllowed('vencido')) {
+          customZone.unitsByCause.vencido += r.causes.vencido;
+          customZone.copByCause.vencido += r.copByCause.vencido;
+        }
+        if (isAdminCauseAllowed('vacio')) {
+          customZone.unitsByCause.vacio += r.causes.vacio;
+          customZone.copByCause.vacio += r.copByCause.vacio;
+        }
+        if (isAdminCauseAllowed('lechozo')) {
+          customZone.unitsByCause.lechozo += r.causes.lechozo;
+          customZone.copByCause.lechozo += r.copByCause.lechozo;
+        }
+        if (isAdminCauseAllowed('xFecha')) {
+          customZone.unitsByCause.xFecha += r.causes.xFecha;
+          customZone.copByCause.xFecha += r.copByCause.xFecha;
+        }
+        if (isAdminCauseAllowed('abomba')) {
+          customZone.unitsByCause.abomba += r.causes.abomba;
+          customZone.copByCause.abomba += r.copByCause.abomba;
+        }
       }
       return computeZoneMetrics(customZone);
     });
-  }, [zones, dateFilteredRows, isDateRangeActive]);
+  }, [zones, dateFilteredRows, isDateRangeActive, dashCauseFilter]);
 
   const filteredZones = useMemo(() => {
     const base = enrichedZones.filter((z) => {
@@ -412,13 +456,66 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
       }
     >();
 
+    const effectiveCategory =
+      dashCauseFilter === 'COMERCIAL' ||
+      dashCauseFilter === 'proxVencer' ||
+      dashCauseFilter === 'vencido' ||
+      dashCauseFilter === 'aCobrar'
+        ? 'COMERCIAL'
+        : dashCauseFilter === 'CALIDAD' ||
+          dashCauseFilter === 'vacio' ||
+          dashCauseFilter === 'lechozo' ||
+          dashCauseFilter === 'xFecha' ||
+          dashCauseFilter === 'abomba'
+        ? 'CALIDAD'
+        : escalafonCategory;
+
     for (const r of dateFilteredRows) {
+      const mProx =
+        effectiveCategory !== 'CALIDAD' && isAdminCauseAllowed('proxVencer')
+          ? r.causes.proxVencer
+          : 0;
+      const mVenc =
+        effectiveCategory !== 'CALIDAD' && isAdminCauseAllowed('vencido')
+          ? r.causes.vencido
+          : 0;
+      const mCobrar =
+        effectiveCategory !== 'CALIDAD' && isAdminCauseAllowed('aCobrar')
+          ? r.causes.aCobrar
+          : 0;
+
+      const mVacio =
+        effectiveCategory !== 'COMERCIAL' && isAdminCauseAllowed('vacio')
+          ? r.causes.vacio
+          : 0;
+      const mLechozo =
+        effectiveCategory !== 'COMERCIAL' && isAdminCauseAllowed('lechozo')
+          ? r.causes.lechozo
+          : 0;
+      const mXFecha =
+        effectiveCategory !== 'COMERCIAL' && isAdminCauseAllowed('xFecha')
+          ? r.causes.xFecha
+          : 0;
+      const mAbomba =
+        effectiveCategory !== 'COMERCIAL' && isAdminCauseAllowed('abomba')
+          ? r.causes.abomba
+          : 0;
+
       // COMERCIAL (Ventas): próximo + vencido + x cobrar
-      const cUnits =
-        r.causes.proxVencer + r.causes.vencido + r.causes.aCobrar;
+      const cUnits = mProx + mVenc + mCobrar;
+      const cCOP =
+        (mProx > 0 ? r.copByCause.proxVencer : 0) +
+        (mVenc > 0 ? r.copByCause.vencido : 0) +
+        (mCobrar > 0 ? r.copByCause.aCobrar : 0);
+
       // CALIDAD (Producción): vacío + lechosidad + x fecha + embombamiento
-      const qUnits =
-        r.causes.vacio + r.causes.lechozo + r.causes.xFecha + r.causes.abomba;
+      const qUnits = mVacio + mLechozo + mXFecha + mAbomba;
+      const qCOP =
+        (mVacio > 0 ? r.copByCause.vacio : 0) +
+        (mLechozo > 0 ? r.copByCause.lechozo : 0) +
+        (mXFecha > 0 ? r.copByCause.xFecha : 0) +
+        (mAbomba > 0 ? r.copByCause.abomba : 0);
+
       const classifiedTotal = cUnits + qUnits;
       if (classifiedTotal <= 0) continue;
 
@@ -448,41 +545,41 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
       }
 
       item.totalUnits += classifiedTotal;
-      item.totalCOP += r.commercialValueCOP + r.qualityValueCOP;
+      item.totalCOP += cCOP + qCOP;
       item.commercialUnits += cUnits;
-      item.commercialCOP += r.commercialValueCOP;
+      item.commercialCOP += cCOP;
       item.qualityUnits += qUnits;
-      item.qualityCOP += r.qualityValueCOP;
-      item.vacioUnits += r.causes.vacio;
-      item.lechozoUnits += r.causes.lechozo;
-      item.xFechaUnits += r.causes.xFecha;
-      item.abombaUnits += r.causes.abomba;
-      item.proxVencerOnlyUnits += r.causes.proxVencer;
-      item.vencidoUnits += r.causes.vencido;
-      item.aCobrarUnits += r.causes.aCobrar;
-      item.proxVencerUnits += r.causes.proxVencer + r.causes.vencido;
+      item.qualityCOP += qCOP;
+      item.vacioUnits += mVacio;
+      item.lechozoUnits += mLechozo;
+      item.xFechaUnits += mXFecha;
+      item.abombaUnits += mAbomba;
+      item.proxVencerOnlyUnits += mProx;
+      item.vencidoUnits += mVenc;
+      item.aCobrarUnits += mCobrar;
+      item.proxVencerUnits += mProx + mVenc;
       if (r.lotNumber && r.lotNumber !== 'S/L') item.lots.add(r.lotNumber);
       item.zones.add(r.zoneId);
     }
 
     let list = Array.from(map.values()).filter((p) => p.totalUnits > 0);
-    if (escalafonCategory === 'COMERCIAL') {
+    if (effectiveCategory === 'COMERCIAL') {
       list = list.filter((p) => p.commercialUnits > 0);
-    } else if (escalafonCategory === 'CALIDAD') {
+    } else if (effectiveCategory === 'CALIDAD') {
       list = list.filter((p) => p.qualityUnits > 0);
     }
 
     const sorted = [...list].sort((a, b) => {
       const valA =
-        escalafonCategory === 'COMERCIAL'
+        effectiveCategory === 'COMERCIAL'
           ? a.commercialUnits
-          : escalafonCategory === 'CALIDAD'
+          : effectiveCategory === 'CALIDAD'
           ? a.qualityUnits
           : a.totalUnits;
       const valB =
-        escalafonCategory === 'COMERCIAL'
+        effectiveCategory === 'COMERCIAL'
           ? b.commercialUnits
-          : escalafonCategory === 'CALIDAD'
+          : effectiveCategory === 'CALIDAD'
           ? b.qualityUnits
           : b.totalUnits;
       if (escalafonOrder === 'ASC') {
@@ -505,13 +602,24 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
         .filter((p) => p.commercialUnits > 0)
         .sort((a, b) => b.commercialUnits - a.commercialUnits)[0] || null;
 
+    const qualityRankedList = [...allList]
+      .filter((p) => p.qualityUnits > 0)
+      .sort((a, b) => b.qualityUnits - a.qualityUnits || b.qualityCOP - a.qualityCOP);
+
+    const commercialRankedList = [...allList]
+      .filter((p) => p.commercialUnits > 0)
+      .sort((a, b) => b.commercialUnits - a.commercialUnits || b.commercialCOP - a.commercialCOP);
+
     return {
       sorted,
       topLechozo,
       topVacio,
       topCommercial,
+      qualityRankedList,
+      commercialRankedList,
+      effectiveCategory,
     };
-  }, [dateFilteredRows, escalafonOrder, escalafonCategory]);
+  }, [dateFilteredRows, escalafonOrder, escalafonCategory, dashCauseFilter]);
 
   // Ranking completo de TODAS las zonas según sus ventas mensuales (de mayor a menor o menor a mayor)
   const zoneSalesRanking = useMemo(() => {
@@ -1309,57 +1417,193 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
               </div>
             </div>
 
-            <div className="rounded-2xl border border-sky-500/30 bg-slate-900/90 p-3.5 space-y-1.5">
-              <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-sky-400">
+            <div className="rounded-2xl border border-sky-500/30 bg-slate-900/95 p-3.5 space-y-2">
+              <div className="flex items-center justify-between gap-2 text-[11px] font-bold uppercase tracking-wider text-sky-400">
                 <span className="flex items-center gap-1">
-                  <FlaskConical className="h-3.5 w-3.5" />
-                  ¿Cuál Devuelven Más por Lechosidad y Vacío?
+                  <FlaskConical className="h-3.5 w-3.5 shrink-0" />
+                  ¿Cuál Devuelven Más por Lechosidad y Vacío? ({productEscalafonData.qualityRankedList.length} Prod.)
                 </span>
-                <span>Planta</span>
+                <span className="text-[10px] text-sky-300 shrink-0">Planta</span>
               </div>
-              {productEscalafonData.topLechozo && (
-                <div className="flex items-center justify-between text-xs pt-1">
-                  <span className="text-slate-200 truncate">
-                    🥛 <strong>Lechosidad:</strong> {productEscalafonData.topLechozo.productName}
-                  </span>
-                  <span className="font-mono font-bold text-violet-300 shrink-0 ml-2">
-                    {productEscalafonData.topLechozo.lechozoUnits} unds
-                  </span>
+
+              {productEscalafonData.qualityRankedList.length === 0 ? (
+                <div className="py-6 text-center text-xs text-slate-400">
+                  Sin productos de Calidad para el filtro actual
                 </div>
-              )}
-              {productEscalafonData.topVacio && (
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-200 truncate">
-                    📦 <strong>Vacío:</strong> {productEscalafonData.topVacio.productName}
-                  </span>
-                  <span className="font-mono font-bold text-sky-300 shrink-0 ml-2">
-                    {productEscalafonData.topVacio.vacioUnits} unds
-                  </span>
+              ) : (
+                <div className="max-h-48 overflow-y-auto pr-1 space-y-1.5 divide-y divide-white/[0.06]">
+                  {productEscalafonData.qualityRankedList.map((prod, idx) => {
+                    const maxQ =
+                      productEscalafonData.qualityRankedList[0]?.qualityUnits || 1;
+                    const lechPct = Math.round(
+                      (prod.lechozoUnits / maxQ) * 100
+                    );
+                    const vacPct = Math.round(
+                      ((prod.vacioUnits + prod.xFechaUnits + prod.abombaUnits) /
+                        maxQ) *
+                        100
+                    );
+                    const isSelectedProd = dashProductFilter === prod.productName;
+                    return (
+                      <button
+                        key={`qual-rank-${prod.productName}`}
+                        type="button"
+                        onClick={() =>
+                          setDashProductFilter((prev) =>
+                            prev === prod.productName ? 'ALL' : prod.productName
+                          )
+                        }
+                        className={`w-full text-left pt-1.5 first:pt-0 rounded-lg px-1.5 py-1 transition-colors ${
+                          isSelectedProd
+                            ? 'bg-sky-500/20 ring-1 ring-sky-400'
+                            : 'hover:bg-white/[0.05]'
+                        }`}
+                        title={`Clic para filtrar todo el dashboard por ${prod.productName}`}
+                      >
+                        <div className="flex items-center justify-between text-xs gap-2">
+                          <span className="text-slate-200 truncate font-medium">
+                            <span className="font-mono text-[10px] font-bold text-sky-400 mr-1.5">
+                              #{idx + 1}
+                            </span>
+                            {prod.productName}
+                          </span>
+                          <span className="font-mono font-bold text-sky-300 shrink-0">
+                            {formatNumber(prod.qualityUnits)} unds
+                          </span>
+                        </div>
+                        <div className="mt-0.5 flex flex-wrap items-center justify-between text-[10px] font-mono text-slate-300">
+                          <div className="flex items-center gap-2">
+                            {prod.lechozoUnits > 0 && (
+                              <span className="text-violet-300">
+                                🥛 Lech: <strong>{prod.lechozoUnits}</strong>
+                              </span>
+                            )}
+                            {prod.vacioUnits > 0 && (
+                              <span className="text-sky-300">
+                                📦 Vacío: <strong>{prod.vacioUnits}</strong>
+                              </span>
+                            )}
+                            {prod.xFechaUnits > 0 && (
+                              <span className="text-cyan-300">
+                                📅 Fecha: <strong>{prod.xFechaUnits}</strong>
+                              </span>
+                            )}
+                            {prod.abombaUnits > 0 && (
+                              <span className="text-fuchsia-300">
+                                💥 Emb: <strong>{prod.abombaUnits}</strong>
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-slate-400">
+                            {formatCOP(prod.qualityCOP)}
+                          </span>
+                        </div>
+                        <div className="mt-1 h-1.5 w-full rounded-full bg-slate-800 overflow-hidden flex">
+                          {prod.lechozoUnits > 0 && (
+                            <div
+                              className="h-full bg-violet-500"
+                              style={{ width: `${Math.max(4, lechPct)}%` }}
+                            />
+                          )}
+                          {prod.vacioUnits + prod.xFechaUnits + prod.abombaUnits >
+                            0 && (
+                            <div
+                              className="h-full bg-sky-400"
+                              style={{ width: `${Math.max(4, vacPct)}%` }}
+                            />
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
 
-            <div className="rounded-2xl border border-amber-500/30 bg-slate-900/90 p-3.5 space-y-1.5">
-              <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-amber-400">
+            <div className="rounded-2xl border border-amber-500/30 bg-slate-900/95 p-3.5 space-y-2">
+              <div className="flex items-center justify-between gap-2 text-[11px] font-bold uppercase tracking-wider text-amber-400">
                 <span className="flex items-center gap-1">
-                  <Briefcase className="h-3.5 w-3.5" />
-                  Control de Inventarios (Comercial)
+                  <Briefcase className="h-3.5 w-3.5 shrink-0" />
+                  Control de Inventarios Comercial ({productEscalafonData.commercialRankedList.length} Prod.)
                 </span>
-                <span>Rotación</span>
+                <span className="text-[10px] text-amber-300 shrink-0">Rotación</span>
               </div>
-              {productEscalafonData.topCommercial && (
-                <div className="flex items-center justify-between text-xs pt-1">
-                  <span className="text-slate-200 truncate">
-                    ⚠️ <strong>Bajar stock:</strong> {productEscalafonData.topCommercial.productName}
-                  </span>
-                  <span className="font-mono font-bold text-amber-300 shrink-0 ml-2">
-                    {productEscalafonData.topCommercial.commercialUnits} unds
-                  </span>
+
+              {productEscalafonData.commercialRankedList.length === 0 ? (
+                <div className="py-6 text-center text-xs text-slate-400">
+                  Sin productos Comerciales para el filtro actual
+                </div>
+              ) : (
+                <div className="max-h-48 overflow-y-auto pr-1 space-y-1.5 divide-y divide-white/[0.06]">
+                  {productEscalafonData.commercialRankedList.map((prod, idx) => {
+                    const maxC =
+                      productEscalafonData.commercialRankedList[0]
+                        ?.commercialUnits || 1;
+                    const barPct = Math.max(
+                      6,
+                      Math.round((prod.commercialUnits / maxC) * 100)
+                    );
+                    const isSelectedProd = dashProductFilter === prod.productName;
+                    return (
+                      <button
+                        key={`comm-rank-${prod.productName}`}
+                        type="button"
+                        onClick={() =>
+                          setDashProductFilter((prev) =>
+                            prev === prod.productName ? 'ALL' : prod.productName
+                          )
+                        }
+                        className={`w-full text-left pt-1.5 first:pt-0 rounded-lg px-1.5 py-1 transition-colors ${
+                          isSelectedProd
+                            ? 'bg-amber-500/20 ring-1 ring-amber-400'
+                            : 'hover:bg-white/[0.05]'
+                        }`}
+                        title={`Clic para filtrar todo el dashboard por ${prod.productName}`}
+                      >
+                        <div className="flex items-center justify-between text-xs gap-2">
+                          <span className="text-slate-200 truncate font-medium">
+                            <span className="font-mono text-[10px] font-bold text-amber-400 mr-1.5">
+                              #{idx + 1}
+                            </span>
+                            {prod.productName}
+                          </span>
+                          <span className="font-mono font-bold text-amber-300 shrink-0">
+                            {formatNumber(prod.commercialUnits)} unds
+                          </span>
+                        </div>
+                        <div className="mt-0.5 flex flex-wrap items-center justify-between text-[10px] font-mono text-slate-300">
+                          <div className="flex items-center gap-2">
+                            {prod.proxVencerOnlyUnits > 0 && (
+                              <span className="text-amber-300">
+                                ⚠️ Próx: <strong>{prod.proxVencerOnlyUnits}</strong>
+                              </span>
+                            )}
+                            {prod.vencidoUnits > 0 && (
+                              <span className="text-orange-300">
+                                ⏰ Venc: <strong>{prod.vencidoUnits}</strong>
+                              </span>
+                            )}
+                            {prod.aCobrarUnits > 0 && (
+                              <span className="text-rose-300">
+                                💲 Cobrar: <strong>{prod.aCobrarUnits}</strong>
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-slate-400">
+                            {formatCOP(prod.commercialCOP)}
+                          </span>
+                        </div>
+                        <div className="mt-1 h-1.5 w-full rounded-full bg-slate-800 overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-amber-500 to-orange-400"
+                            style={{ width: `${barPct}%` }}
+                          />
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               )}
-              <div className="text-[11px] text-slate-400">
-                Usa la tabla inferior en escalafón para ajustar pedidos por ruta y lote.
-              </div>
             </div>
           </div>
         </div>
@@ -1371,8 +1615,8 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
               <tr className="border-b border-neutral-200/70 dark:border-white/10 bg-neutral-100/70 dark:bg-slate-950/70 text-[10px] font-semibold uppercase tracking-wider text-neutral-600 dark:text-slate-300">
                 <th className="py-2.5 pl-4 pr-2">#</th>
                 <th className="px-2.5 py-2.5">Producto / Referencia</th>
-                {(escalafonCategory === 'ALL' ||
-                  escalafonCategory === 'COMERCIAL') && (
+                {(productEscalafonData.effectiveCategory === 'ALL' ||
+                  productEscalafonData.effectiveCategory === 'COMERCIAL') && (
                   <>
                     <th className="px-2 py-2.5 text-center text-amber-300" title="Próximo a Vencer">Próx.</th>
                     <th className="px-2 py-2.5 text-center text-orange-300" title="Vencido">Venc.</th>
@@ -1382,8 +1626,8 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
                     </th>
                   </>
                 )}
-                {(escalafonCategory === 'ALL' ||
-                  escalafonCategory === 'CALIDAD') && (
+                {(productEscalafonData.effectiveCategory === 'ALL' ||
+                  productEscalafonData.effectiveCategory === 'CALIDAD') && (
                   <>
                     <th className="px-2 py-2.5 text-center text-sky-300" title="Vacío">Vacío</th>
                     <th className="px-2 py-2.5 text-center text-violet-300" title="Lechosidad">Lechos.</th>
@@ -1395,7 +1639,7 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
                   </>
                 )}
                 <th className="px-2.5 py-2.5 text-right font-extrabold">
-                  Total Dev. {escalafonCategory !== 'ALL' ? `(${escalafonCategory})` : ''}
+                  Total Dev. {productEscalafonData.effectiveCategory !== 'ALL' ? `(${productEscalafonData.effectiveCategory})` : ''}
                 </th>
                 <th className="py-2.5 pl-2.5 pr-4">Acción Correctiva</th>
               </tr>
@@ -1403,20 +1647,20 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
             <tbody className="divide-y divide-neutral-200/50 dark:divide-white/[0.07] text-xs">
               {productEscalafonData.sorted.map((prod, idx) => {
                 const displayTotalUnits =
-                  escalafonCategory === 'COMERCIAL'
+                  productEscalafonData.effectiveCategory === 'COMERCIAL'
                     ? prod.commercialUnits
-                    : escalafonCategory === 'CALIDAD'
+                    : productEscalafonData.effectiveCategory === 'CALIDAD'
                     ? prod.qualityUnits
                     : prod.totalUnits;
                 const displayTotalCOP =
-                  escalafonCategory === 'COMERCIAL'
+                  productEscalafonData.effectiveCategory === 'COMERCIAL'
                     ? prod.commercialCOP
-                    : escalafonCategory === 'CALIDAD'
+                    : productEscalafonData.effectiveCategory === 'CALIDAD'
                     ? prod.qualityCOP
                     : prod.totalCOP;
 
                 const actionLabel =
-                  escalafonCategory === 'COMERCIAL' ||
+                  productEscalafonData.effectiveCategory === 'COMERCIAL' ||
                   prod.commercialUnits > prod.qualityUnits
                     ? '📉 Bajar inventario en ruta'
                     : prod.lechozoUnits >= prod.vacioUnits && prod.lechozoUnits > 0
@@ -1442,8 +1686,8 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
                         {Array.from(prod.lots).slice(0, 4).join(', ') || 'S/L'}
                       </div>
                     </td>
-                    {(escalafonCategory === 'ALL' ||
-                      escalafonCategory === 'COMERCIAL') && (
+                    {(productEscalafonData.effectiveCategory === 'ALL' ||
+                      productEscalafonData.effectiveCategory === 'COMERCIAL') && (
                       <>
                         <td className="px-2 py-2 text-center font-mono text-amber-300">
                           {prod.proxVencerOnlyUnits || '—'}
@@ -1464,8 +1708,8 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
                         </td>
                       </>
                     )}
-                    {(escalafonCategory === 'ALL' ||
-                      escalafonCategory === 'CALIDAD') && (
+                    {(productEscalafonData.effectiveCategory === 'ALL' ||
+                      productEscalafonData.effectiveCategory === 'CALIDAD') && (
                       <>
                         <td className="px-2 py-2 text-center font-mono text-sky-300">
                           {prod.vacioUnits || '—'}
@@ -1690,18 +1934,26 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
                     <tr className="border-b border-neutral-200/70 dark:border-white/15 bg-neutral-100/70 dark:bg-slate-950/70 text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-slate-300 whitespace-nowrap">
                       <th className="py-3.5 pl-6 pr-4">Zona Comercial</th>
                       <th className="px-4 py-3.5 text-right">Ventas Mes</th>
-                      <th className="px-4 py-3.5 text-right text-amber-600 dark:text-amber-300 bg-amber-500/[0.04]">
-                        Comercial ({metricMode === 'COP' ? '$' : 'Und'})
-                      </th>
-                      <th className="px-3 py-3.5 text-right text-amber-600 dark:text-amber-300 bg-amber-500/[0.04]">
-                        % Come
-                      </th>
-                      <th className="px-4 py-3.5 text-right text-sky-600 dark:text-sky-300 bg-sky-500/[0.04]">
-                        Calidad ({metricMode === 'COP' ? '$' : 'Und'})
-                      </th>
-                      <th className="px-3 py-3.5 text-right text-sky-600 dark:text-sky-300 bg-sky-500/[0.04]">
-                        % Calid
-                      </th>
+                      {showAdminComercialCols && (
+                        <>
+                          <th className="px-4 py-3.5 text-right text-amber-600 dark:text-amber-300 bg-amber-500/[0.04]">
+                            Comercial ({metricMode === 'COP' ? '$' : 'Und'})
+                          </th>
+                          <th className="px-3 py-3.5 text-right text-amber-600 dark:text-amber-300 bg-amber-500/[0.04]">
+                            % Come
+                          </th>
+                        </>
+                      )}
+                      {showAdminCalidadCols && (
+                        <>
+                          <th className="px-4 py-3.5 text-right text-sky-600 dark:text-sky-300 bg-sky-500/[0.04]">
+                            Calidad ({metricMode === 'COP' ? '$' : 'Und'})
+                          </th>
+                          <th className="px-3 py-3.5 text-right text-sky-600 dark:text-sky-300 bg-sky-500/[0.04]">
+                            % Calid
+                          </th>
+                        </>
+                      )}
                       <th className="px-4 py-3.5 text-right text-emerald-600 dark:text-emerald-300 bg-emerald-500/[0.04]">
                         Total Dev ({metricMode === 'COP' ? '$' : 'Und'})
                       </th>
@@ -1756,25 +2008,33 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
                             </button>
                           </td>
 
-                          <td className="px-4 py-3.5 text-right font-mono font-bold text-amber-600 dark:text-amber-300 bg-amber-500/[0.02]">
-                            {metricMode === 'COP'
-                              ? formatCOP(z.commercialCOP)
-                              : `${formatNumber(z.commercialUnits)} und`}
-                          </td>
+                          {showAdminComercialCols && (
+                            <>
+                              <td className="px-4 py-3.5 text-right font-mono font-bold text-amber-600 dark:text-amber-300 bg-amber-500/[0.02]">
+                                {metricMode === 'COP'
+                                  ? formatCOP(z.commercialCOP)
+                                  : `${formatNumber(z.commercialUnits)} und`}
+                              </td>
 
-                          <td className="px-3 py-3.5 text-right font-mono text-xs font-medium text-amber-600/80 dark:text-amber-200/80 bg-amber-500/[0.02]">
-                            {formatPercent(z.pctCommercialOverSales)}
-                          </td>
+                              <td className="px-3 py-3.5 text-right font-mono text-xs font-medium text-amber-600/80 dark:text-amber-200/80 bg-amber-500/[0.02]">
+                                {formatPercent(z.pctCommercialOverSales)}
+                              </td>
+                            </>
+                          )}
 
-                          <td className="px-4 py-3.5 text-right font-mono font-bold text-sky-600 dark:text-sky-300 bg-sky-500/[0.02]">
-                            {metricMode === 'COP'
-                              ? formatCOP(z.qualityCOP)
-                              : `${formatNumber(z.qualityUnits)} und`}
-                          </td>
+                          {showAdminCalidadCols && (
+                            <>
+                              <td className="px-4 py-3.5 text-right font-mono font-bold text-sky-600 dark:text-sky-300 bg-sky-500/[0.02]">
+                                {metricMode === 'COP'
+                                  ? formatCOP(z.qualityCOP)
+                                  : `${formatNumber(z.qualityUnits)} und`}
+                              </td>
 
-                          <td className="px-3 py-3.5 text-right font-mono text-xs font-medium text-sky-600/80 dark:text-sky-200/80 bg-sky-500/[0.02]">
-                            {formatPercent(z.pctQualityOverSales)}
-                          </td>
+                              <td className="px-3 py-3.5 text-right font-mono text-xs font-medium text-sky-600/80 dark:text-sky-200/80 bg-sky-500/[0.02]">
+                                {formatPercent(z.pctQualityOverSales)}
+                              </td>
+                            </>
+                          )}
 
                           <td className="px-4 py-3.5 text-right font-mono font-extrabold text-neutral-900 dark:text-white bg-emerald-500/[0.02]">
                             {metricMode === 'COP'
@@ -1811,30 +2071,38 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
                       <td className="px-4 py-4 text-right">
                         {formatCompactCOP(totals.salesCOP)}
                       </td>
-                      <td className="px-4 py-4 text-right text-amber-600 dark:text-amber-300">
-                        {metricMode === 'COP'
-                          ? formatCOP(totals.commercialCOP)
-                          : `${formatNumber(totals.commercialUnits)} und`}
-                      </td>
-                      <td className="px-3 py-4 text-right text-amber-600 dark:text-amber-300">
-                        {formatPercent(
-                          totals.salesCOP > 0
-                            ? (totals.commercialCOP / totals.salesCOP) * 100
-                            : 0
-                        )}
-                      </td>
-                      <td className="px-4 py-4 text-right text-sky-600 dark:text-sky-300">
-                        {metricMode === 'COP'
-                          ? formatCOP(totals.qualityCOP)
-                          : `${formatNumber(totals.qualityUnits)} und`}
-                      </td>
-                      <td className="px-3 py-4 text-right text-sky-600 dark:text-sky-300">
-                        {formatPercent(
-                          totals.salesCOP > 0
-                            ? (totals.qualityCOP / totals.salesCOP) * 100
-                            : 0
-                        )}
-                      </td>
+                      {showAdminComercialCols && (
+                        <>
+                          <td className="px-4 py-4 text-right text-amber-600 dark:text-amber-300">
+                            {metricMode === 'COP'
+                              ? formatCOP(totals.commercialCOP)
+                              : `${formatNumber(totals.commercialUnits)} und`}
+                          </td>
+                          <td className="px-3 py-4 text-right text-amber-600 dark:text-amber-300">
+                            {formatPercent(
+                              totals.salesCOP > 0
+                                ? (totals.commercialCOP / totals.salesCOP) * 100
+                                : 0
+                            )}
+                          </td>
+                        </>
+                      )}
+                      {showAdminCalidadCols && (
+                        <>
+                          <td className="px-4 py-4 text-right text-sky-600 dark:text-sky-300">
+                            {metricMode === 'COP'
+                              ? formatCOP(totals.qualityCOP)
+                              : `${formatNumber(totals.qualityUnits)} und`}
+                          </td>
+                          <td className="px-3 py-4 text-right text-sky-600 dark:text-sky-300">
+                            {formatPercent(
+                              totals.salesCOP > 0
+                                ? (totals.qualityCOP / totals.salesCOP) * 100
+                                : 0
+                            )}
+                          </td>
+                        </>
+                      )}
                       <td className="px-4 py-4 text-right text-emerald-400">
                         {metricMode === 'COP'
                           ? formatCOP(totals.totalCOP)

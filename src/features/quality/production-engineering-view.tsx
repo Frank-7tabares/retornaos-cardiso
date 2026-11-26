@@ -202,40 +202,104 @@ export const ProductionEngineeringView: React.FC<
     selectedClientFilter,
   ]);
 
+  const isCauseIncluded = (k: ReturnCauseKey): boolean => {
+    if (causeFilter === 'ALL') return true;
+    if (causeFilter === 'CALIDAD') {
+      return (
+        k === 'vacio' ||
+        k === 'lechozo' ||
+        k === 'xFecha' ||
+        k === 'abomba'
+      );
+    }
+    if (causeFilter === 'COMERCIAL') {
+      return k === 'proxVencer' || k === 'vencido' || k === 'aCobrar';
+    }
+    return causeFilter === k;
+  };
+
   const filteredRows = useMemo(() => {
-    return basePeriodRows.filter((row) => {
+    const out: ComputedReturnRow[] = [];
+
+    for (const row of basePeriodRows) {
       if (
         selectedProductFilter !== 'ALL' &&
         row.productName !== selectedProductFilter
       ) {
-        return false;
+        continue;
       }
-      if (causeFilter === 'CALIDAD') {
-        const qSum =
-          row.causes.lechozo +
-          row.causes.vacio +
-          row.causes.xFecha +
-          row.causes.abomba;
-        if (qSum <= 0) return false;
-      } else if (causeFilter === 'COMERCIAL') {
-        const cSum =
-          row.causes.proxVencer + row.causes.vencido + row.causes.aCobrar;
-        if (cSum <= 0) return false;
-      } else if (causeFilter !== 'ALL') {
-        if ((row.causes[causeFilter] || 0) <= 0) return false;
-      }
+
+      const mVacio = isCauseIncluded('vacio') ? row.causes.vacio : 0;
+      const mLechozo = isCauseIncluded('lechozo') ? row.causes.lechozo : 0;
+      const mXFecha = isCauseIncluded('xFecha') ? row.causes.xFecha : 0;
+      const mAbomba = isCauseIncluded('abomba') ? row.causes.abomba : 0;
+      const mProx = isCauseIncluded('proxVencer') ? row.causes.proxVencer : 0;
+      const mVenc = isCauseIncluded('vencido') ? row.causes.vencido : 0;
+      const mCobrar = isCauseIncluded('aCobrar') ? row.causes.aCobrar : 0;
+
+      const qSum = mVacio + mLechozo + mXFecha + mAbomba;
+      const cSum = mProx + mVenc + mCobrar;
+      const totalMatched = qSum + cSum;
+
+      if (totalMatched <= 0) continue;
+
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
-        return (
+        const matchesText =
           row.productName.toLowerCase().includes(q) ||
           row.lotNumber.toLowerCase().includes(q) ||
           row.clientName.toLowerCase().includes(q) ||
           row.zoneName.toLowerCase().includes(q) ||
-          row.observations.toLowerCase().includes(q)
-        );
+          row.observations.toLowerCase().includes(q);
+        if (!matchesText) continue;
       }
-      return true;
-    });
+
+      if (causeFilter === 'ALL') {
+        out.push(row);
+      } else {
+        const maskedCauses: Record<ReturnCauseKey, number> = {
+          vacio: mVacio,
+          lechozo: mLechozo,
+          xFecha: mXFecha,
+          abomba: mAbomba,
+          proxVencer: mProx,
+          vencido: mVenc,
+          aCobrar: mCobrar,
+        };
+        const qCOP =
+          (mVacio > 0 ? row.copByCause.vacio : 0) +
+          (mLechozo > 0 ? row.copByCause.lechozo : 0) +
+          (mXFecha > 0 ? row.copByCause.xFecha : 0) +
+          (mAbomba > 0 ? row.copByCause.abomba : 0);
+        const cCOP =
+          (mProx > 0 ? row.copByCause.proxVencer : 0) +
+          (mVenc > 0 ? row.copByCause.vencido : 0) +
+          (mCobrar > 0 ? row.copByCause.aCobrar : 0);
+
+        // Determine primaryCauseKey ONLY among the allowed causes
+        let bestKey: ReturnCauseKey = 'proxVencer';
+        let bestVal = -1;
+        (Object.keys(maskedCauses) as ReturnCauseKey[]).forEach((k) => {
+          if (maskedCauses[k] > bestVal) {
+            bestVal = maskedCauses[k];
+            bestKey = k;
+          }
+        });
+
+        out.push({
+          ...row,
+          qtyToReceive: totalMatched,
+          totalClassifiedUnits: totalMatched,
+          qualityValueCOP: qCOP,
+          commercialValueCOP: cCOP,
+          totalValueCOP: qCOP + cCOP,
+          causes: maskedCauses,
+          primaryCauseKey: bestKey,
+        });
+      }
+    }
+
+    return out;
   }, [
     basePeriodRows,
     selectedProductFilter,
@@ -287,50 +351,65 @@ export const ProductionEngineeringView: React.FC<
     );
   }, [basePeriodRows]);
 
-  // Datos para las Gráficas de Ingeniería de Producción (Causas, Lotes y Fechas)
+  // Datos para las Gráficas de Ingeniería de Producción (Causas, Lotes y Fechas sincronizados con el filtro activo: Comercial vs Calidad)
   const engineeringChartsData = useMemo(() => {
-    const causesList = [
+    const allCausesList = [
       {
         key: 'lechozo' as ReturnCauseKey,
         label: 'Lechosidad (Planta)',
-        units: globalMetrics.lechozoUnits,
+        units: isCauseIncluded('lechozo') ? globalMetrics.lechozoUnits : 0,
         colorHex: '#8b5cf6',
         barClass: 'bg-violet-500',
         textClass: 'text-violet-300',
+        group: 'CALIDAD',
       },
       {
         key: 'vacio' as ReturnCauseKey,
         label: 'Pérdida de Vacío (Planta)',
-        units: globalMetrics.vacioUnits,
+        units: isCauseIncluded('vacio') ? globalMetrics.vacioUnits : 0,
         colorHex: '#0ea5e9',
         barClass: 'bg-sky-500',
         textClass: 'text-sky-300',
-      },
-      {
-        key: 'proxVencer' as ReturnCauseKey,
-        label: 'Próx. a Vencer (Comercial)',
-        units: globalMetrics.proxVencerUnits,
-        colorHex: '#f59e0b',
-        barClass: 'bg-amber-500',
-        textClass: 'text-amber-300',
+        group: 'CALIDAD',
       },
       {
         key: 'xFecha' as ReturnCauseKey,
-        label: 'Por Fecha / Abombamiento',
-        units: globalMetrics.xFechaUnits + globalMetrics.abombaUnits,
+        label: 'X Fecha / Embombamiento (Planta)',
+        units:
+          (isCauseIncluded('xFecha') ? globalMetrics.xFechaUnits : 0) +
+          (isCauseIncluded('abomba') ? globalMetrics.abombaUnits : 0),
         colorHex: '#06b6d4',
         barClass: 'bg-cyan-500',
         textClass: 'text-cyan-300',
+        group: 'CALIDAD',
+      },
+      {
+        key: 'proxVencer' as ReturnCauseKey,
+        label: 'Próximo a Vencer (Comercial)',
+        units: isCauseIncluded('proxVencer') ? globalMetrics.proxVencerUnits : 0,
+        colorHex: '#f59e0b',
+        barClass: 'bg-amber-500',
+        textClass: 'text-amber-300',
+        group: 'COMERCIAL',
       },
       {
         key: 'aCobrar' as ReturnCauseKey,
-        label: 'A Cobrar / Vencido',
-        units: globalMetrics.aCobrarUnits + globalMetrics.vencidoUnits,
+        label: 'Vencido / X Cobrar (Comercial)',
+        units:
+          (isCauseIncluded('aCobrar') ? globalMetrics.aCobrarUnits : 0) +
+          (isCauseIncluded('vencido') ? globalMetrics.vencidoUnits : 0),
         colorHex: '#f43f5e',
         barClass: 'bg-rose-500',
         textClass: 'text-rose-300',
+        group: 'COMERCIAL',
       },
     ];
+
+    const causesList = allCausesList.filter((c) => {
+      if (!showCalidadGroup && c.group === 'CALIDAD') return false;
+      if (!showComercialGroup && c.group === 'COMERCIAL') return false;
+      return true;
+    });
 
     const totalCauseUnits = Math.max(
       1,
@@ -350,8 +429,16 @@ export const ProductionEngineeringView: React.FC<
 
     for (const r of basePeriodRows) {
       const qU =
-        r.causes.lechozo + r.causes.vacio + r.causes.xFecha + r.causes.abomba;
-      const cU = r.causes.aCobrar + r.causes.proxVencer + r.causes.vencido;
+        (isCauseIncluded('lechozo') ? r.causes.lechozo : 0) +
+        (isCauseIncluded('vacio') ? r.causes.vacio : 0) +
+        (isCauseIncluded('xFecha') ? r.causes.xFecha : 0) +
+        (isCauseIncluded('abomba') ? r.causes.abomba : 0);
+      const cU =
+        (isCauseIncluded('aCobrar') ? r.causes.aCobrar : 0) +
+        (isCauseIncluded('proxVencer') ? r.causes.proxVencer : 0) +
+        (isCauseIncluded('vencido') ? r.causes.vencido : 0);
+
+      if (qU + cU <= 0) continue;
 
       if (r.lotNumber && r.lotNumber !== 'S/L') {
         const prevLot = lotMap.get(r.lotNumber) || {
@@ -394,7 +481,7 @@ export const ProductionEngineeringView: React.FC<
       topLotsChart,
       timelineChart,
     };
-  }, [basePeriodRows, globalMetrics]);
+  }, [basePeriodRows, globalMetrics, causeFilter, showCalidadGroup, showComercialGroup]);
 
   // Matriz de Productos sincronizada con el filtro de causa activo (cuando filtras Comercial o una causa específica, SOLO suma y muestra esa causa/grupo sin mezclar Planta con Comercial)
   const allProductsMatrix = useMemo<ProductQualitySummary[]>(() => {
@@ -685,117 +772,129 @@ export const ProductionEngineeringView: React.FC<
           </div>
         </div>
 
-        {/* 2 Bloques Oficiales Invariantes: CALIDAD (Producción) y COMERCIAL (Ventas) */}
+        {/* Bloques Oficiales Sincronizados con el Filtro: CALIDAD (Producción) y COMERCIAL (Ventas) */}
         <div className="mt-5 grid grid-cols-1 lg:grid-cols-12 gap-3.5">
           {/* Bloque CALIDAD (Producción): Vacío, Lechosidad, X Fecha, Embombamiento */}
-          <div className="lg:col-span-7 rounded-2xl border border-sky-500/35 bg-sky-950/25 p-4 space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-sky-500/20 pb-2.5">
-              <div>
-                <span className="text-xs font-extrabold uppercase tracking-wider text-sky-300">
-                  1. CALIDAD (Producción) — Vacío · Lechosidad · X Fecha · Embombamiento
-                </span>
-                <p className="text-[11px] text-slate-300">
-                  Suma exacta de las 4 causales de planta
-                </p>
-              </div>
-              <div className="text-right">
-                <div className="font-mono text-lg sm:text-xl font-extrabold text-sky-300">
-                  {formatNumber(globalMetrics.qualityUnits)} und · {formatCOP(globalMetrics.qualityCOP)}
+          {showCalidadGroup && (
+            <div
+              className={`${
+                showComercialGroup ? 'lg:col-span-7' : 'lg:col-span-12'
+              } rounded-2xl border border-sky-500/35 bg-sky-950/25 p-4 space-y-3`}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-sky-500/20 pb-2.5">
+                <div>
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-sky-300">
+                    1. CALIDAD (Producción) — Vacío · Lechosidad · X Fecha · Embombamiento
+                  </span>
+                  <p className="text-[11px] text-slate-300">
+                    Suma exacta de las 4 causales de planta
+                  </p>
                 </div>
-                <span className="text-[10px] text-sky-200/80">
-                  {globalMetrics.totalUnits > 0
-                    ? `${formatPercent((globalMetrics.qualityUnits / globalMetrics.totalUnits) * 100)} de las unidades`
-                    : '0%'}
-                </span>
+                <div className="text-right">
+                  <div className="font-mono text-lg sm:text-xl font-extrabold text-sky-300">
+                    {formatNumber(globalMetrics.qualityUnits)} und · {formatCOP(globalMetrics.qualityCOP)}
+                  </div>
+                  <span className="text-[10px] text-sky-200/80">
+                    {globalMetrics.totalUnits > 0
+                      ? `${formatPercent((globalMetrics.qualityUnits / globalMetrics.totalUnits) * 100)} de las unidades`
+                      : '0%'}
+                  </span>
+                </div>
               </div>
-            </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-              <div className="rounded-xl border border-sky-500/30 bg-slate-900/80 p-2.5">
-                <div className="text-[10px] font-bold uppercase text-sky-300">
-                  • Vacío
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                <div className="rounded-xl border border-sky-500/30 bg-slate-900/80 p-2.5">
+                  <div className="text-[10px] font-bold uppercase text-sky-300">
+                    • Vacío
+                  </div>
+                  <div className="mt-0.5 font-mono text-lg font-extrabold text-white">
+                    {formatNumber(globalMetrics.vacioUnits)} und
+                  </div>
                 </div>
-                <div className="mt-0.5 font-mono text-lg font-extrabold text-white">
-                  {formatNumber(globalMetrics.vacioUnits)} und
+                <div className="rounded-xl border border-violet-500/30 bg-slate-900/80 p-2.5">
+                  <div className="text-[10px] font-bold uppercase text-violet-300">
+                    • Lechosidad
+                  </div>
+                  <div className="mt-0.5 font-mono text-lg font-extrabold text-white">
+                    {formatNumber(globalMetrics.lechozoUnits)} und
+                  </div>
                 </div>
-              </div>
-              <div className="rounded-xl border border-violet-500/30 bg-slate-900/80 p-2.5">
-                <div className="text-[10px] font-bold uppercase text-violet-300">
-                  • Lechosidad
+                <div className="rounded-xl border border-cyan-500/30 bg-slate-900/80 p-2.5">
+                  <div className="text-[10px] font-bold uppercase text-cyan-300">
+                    • X Fecha
+                  </div>
+                  <div className="mt-0.5 font-mono text-lg font-extrabold text-white">
+                    {formatNumber(globalMetrics.xFechaUnits)} und
+                  </div>
                 </div>
-                <div className="mt-0.5 font-mono text-lg font-extrabold text-white">
-                  {formatNumber(globalMetrics.lechozoUnits)} und
-                </div>
-              </div>
-              <div className="rounded-xl border border-cyan-500/30 bg-slate-900/80 p-2.5">
-                <div className="text-[10px] font-bold uppercase text-cyan-300">
-                  • X Fecha
-                </div>
-                <div className="mt-0.5 font-mono text-lg font-extrabold text-white">
-                  {formatNumber(globalMetrics.xFechaUnits)} und
-                </div>
-              </div>
-              <div className="rounded-xl border border-fuchsia-500/30 bg-slate-900/80 p-2.5">
-                <div className="text-[10px] font-bold uppercase text-fuchsia-300">
-                  • Embombamiento
-                </div>
-                <div className="mt-0.5 font-mono text-lg font-extrabold text-white">
-                  {formatNumber(globalMetrics.abombaUnits)} und
+                <div className="rounded-xl border border-fuchsia-500/30 bg-slate-900/80 p-2.5">
+                  <div className="text-[10px] font-bold uppercase text-fuchsia-300">
+                    • Embombamiento
+                  </div>
+                  <div className="mt-0.5 font-mono text-lg font-extrabold text-white">
+                    {formatNumber(globalMetrics.abombaUnits)} und
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Bloque COMERCIAL (Ventas): Próximo, Vencido, X Cobrar */}
-          <div className="lg:col-span-5 rounded-2xl border border-amber-500/35 bg-amber-950/25 p-4 space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-500/20 pb-2.5">
-              <div>
-                <span className="text-xs font-extrabold uppercase tracking-wider text-amber-300">
-                  2. COMERCIAL (Ventas) — Próximo · Vencido · X Cobrar
-                </span>
-                <p className="text-[11px] text-slate-300">
-                  Suma exacta de las 3 causales comerciales (Total Global: {formatNumber(globalMetrics.totalUnits)} und)
-                </p>
-              </div>
-              <div className="text-right">
-                <div className="font-mono text-lg sm:text-xl font-extrabold text-amber-300">
-                  {formatNumber(globalMetrics.commercialUnits)} und · {formatCOP(globalMetrics.commercialCOP)}
+          {showComercialGroup && (
+            <div
+              className={`${
+                showCalidadGroup ? 'lg:col-span-5' : 'lg:col-span-12'
+              } rounded-2xl border border-amber-500/35 bg-amber-950/25 p-4 space-y-3`}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-500/20 pb-2.5">
+                <div>
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-amber-300">
+                    {showCalidadGroup ? '2. ' : ''}COMERCIAL (Ventas) — Próximo · Vencido · X Cobrar
+                  </span>
+                  <p className="text-[11px] text-slate-300">
+                    Suma exacta de las 3 causales comerciales
+                  </p>
                 </div>
-                <span className="text-[10px] text-amber-200/80">
-                  {globalMetrics.totalUnits > 0
-                    ? `${formatPercent((globalMetrics.commercialUnits / globalMetrics.totalUnits) * 100)} de las unidades`
-                    : '0%'}
-                </span>
+                <div className="text-right">
+                  <div className="font-mono text-lg sm:text-xl font-extrabold text-amber-300">
+                    {formatNumber(globalMetrics.commercialUnits)} und · {formatCOP(globalMetrics.commercialCOP)}
+                  </div>
+                  <span className="text-[10px] text-amber-200/80">
+                    {globalMetrics.totalUnits > 0
+                      ? `${formatPercent((globalMetrics.commercialUnits / globalMetrics.totalUnits) * 100)} de las unidades`
+                      : '0%'}
+                  </span>
+                </div>
               </div>
-            </div>
 
-            <div className="grid grid-cols-3 gap-2.5">
-              <div className="rounded-xl border border-amber-500/30 bg-slate-900/80 p-2.5">
-                <div className="text-[10px] font-bold uppercase text-amber-300">
-                  • Próximo
+              <div className="grid grid-cols-3 gap-2.5">
+                <div className="rounded-xl border border-amber-500/30 bg-slate-900/80 p-2.5">
+                  <div className="text-[10px] font-bold uppercase text-amber-300">
+                    • Próximo
+                  </div>
+                  <div className="mt-0.5 font-mono text-lg font-extrabold text-white">
+                    {formatNumber(globalMetrics.proxVencerUnits)} und
+                  </div>
                 </div>
-                <div className="mt-0.5 font-mono text-lg font-extrabold text-white">
-                  {formatNumber(globalMetrics.proxVencerUnits)} und
+                <div className="rounded-xl border border-orange-500/30 bg-slate-900/80 p-2.5">
+                  <div className="text-[10px] font-bold uppercase text-orange-300">
+                    • Vencido
+                  </div>
+                  <div className="mt-0.5 font-mono text-lg font-extrabold text-white">
+                    {formatNumber(globalMetrics.vencidoUnits)} und
+                  </div>
                 </div>
-              </div>
-              <div className="rounded-xl border border-orange-500/30 bg-slate-900/80 p-2.5">
-                <div className="text-[10px] font-bold uppercase text-orange-300">
-                  • Vencido
-                </div>
-                <div className="mt-0.5 font-mono text-lg font-extrabold text-white">
-                  {formatNumber(globalMetrics.vencidoUnits)} und
-                </div>
-              </div>
-              <div className="rounded-xl border border-rose-500/30 bg-slate-900/80 p-2.5">
-                <div className="text-[10px] font-bold uppercase text-rose-300">
-                  • X Cobrar
-                </div>
-                <div className="mt-0.5 font-mono text-lg font-extrabold text-white">
-                  {formatNumber(globalMetrics.aCobrarUnits)} und
+                <div className="rounded-xl border border-rose-500/30 bg-slate-900/80 p-2.5">
+                  <div className="text-[10px] font-bold uppercase text-rose-300">
+                    • X Cobrar
+                  </div>
+                  <div className="mt-0.5 font-mono text-lg font-extrabold text-white">
+                    {formatNumber(globalMetrics.aCobrarUnits)} und
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 
@@ -1011,54 +1110,91 @@ export const ProductionEngineeringView: React.FC<
                   </svg>
                   <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
                     <span className="font-mono text-xs font-extrabold text-white">
-                      {globalMetrics.totalUnits > 0
-                        ? Math.round(
+                      {!showCalidadGroup
+                        ? '100%'
+                        : !showComercialGroup
+                        ? '100%'
+                        : globalMetrics.totalUnits > 0
+                        ? `${Math.round(
                             ((globalMetrics.lechozoUnits +
                               globalMetrics.vacioUnits +
                               globalMetrics.xFechaUnits +
                               globalMetrics.abombaUnits) /
                               globalMetrics.totalUnits) *
                               100
-                          )
-                        : 0}
-                      %
+                          )}%`
+                        : '0%'}
                     </span>
                     <span className="text-[9px] uppercase text-sky-300 font-bold">
-                      Planta
+                      {!showCalidadGroup ? 'Comercial' : 'Planta'}
                     </span>
                   </div>
                 </div>
 
                 <div className="space-y-1.5 text-xs flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <span className="text-violet-300 font-semibold">
-                      🟣 Lechosidad:
-                    </span>
-                    <span className="font-mono font-bold text-white">
-                      {formatNumber(globalMetrics.lechozoUnits)} u
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sky-300 font-semibold">
-                      🔵 Vacío:
-                    </span>
-                    <span className="font-mono font-bold text-white">
-                      {formatNumber(globalMetrics.vacioUnits)} u
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-amber-300 font-semibold">
-                      🟠 Comercial:
-                    </span>
-                    <span className="font-mono font-bold text-white">
-                      {formatNumber(
-                        globalMetrics.proxVencerUnits +
-                          globalMetrics.aCobrarUnits +
-                          globalMetrics.vencidoUnits
-                      )}{' '}
-                      u
-                    </span>
-                  </div>
+                  {showCalidadGroup && (
+                    <>
+                      <div className="flex items-center justify-between">
+                        <span className="text-violet-300 font-semibold">
+                          🟣 Lechosidad:
+                        </span>
+                        <span className="font-mono font-bold text-white">
+                          {formatNumber(
+                            isCauseIncluded('lechozo')
+                              ? globalMetrics.lechozoUnits
+                              : 0
+                          )}{' '}
+                          u
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sky-300 font-semibold">
+                          🔵 Vacío:
+                        </span>
+                        <span className="font-mono font-bold text-white">
+                          {formatNumber(
+                            isCauseIncluded('vacio')
+                              ? globalMetrics.vacioUnits
+                              : 0
+                          )}{' '}
+                          u
+                        </span>
+                      </div>
+                    </>
+                  )}
+                  {showComercialGroup && (
+                    <>
+                      <div className="flex items-center justify-between">
+                        <span className="text-amber-300 font-semibold">
+                          🟠 Próximo:
+                        </span>
+                        <span className="font-mono font-bold text-white">
+                          {formatNumber(
+                            isCauseIncluded('proxVencer')
+                              ? globalMetrics.proxVencerUnits
+                              : 0
+                          )}{' '}
+                          u
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-rose-300 font-semibold">
+                          🔴 Venc. + X Cobrar:
+                        </span>
+                        <span className="font-mono font-bold text-white">
+                          {formatNumber(
+                            (isCauseIncluded('vencido')
+                              ? globalMetrics.vencidoUnits
+                              : 0) +
+                              (isCauseIncluded('aCobrar')
+                                ? globalMetrics.aCobrarUnits
+                                : 0)
+                          )}{' '}
+                          u
+                        </span>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 
