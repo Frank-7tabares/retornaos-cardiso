@@ -68,6 +68,9 @@ export const ProductionEngineeringView: React.FC<
     useState<string>('ALL');
   const [selectedDateFilter, setSelectedDateFilter] = useState<string>('ALL');
   const [selectedLotFilter, setSelectedLotFilter] = useState<string>('ALL');
+  const [selectedZoneFilter, setSelectedZoneFilter] = useState<string>('ALL');
+  const [selectedClientFilter, setSelectedClientFilter] =
+    useState<string>('ALL');
   const [causeFilter, setCauseFilter] = useState<
     'ALL' | 'CALIDAD' | 'COMERCIAL' | ReturnCauseKey
   >('ALL');
@@ -143,13 +146,43 @@ export const ProductionEngineeringView: React.FC<
     return Array.from(map.keys()).sort();
   }, [returnRows]);
 
-  // Filas base invariantes (solo filtradas por Fecha y Lote cuando el usuario elige una Fecha o Lote, para que los datos de productos, semáforos y tabla NUNCA cambien ni se distorsionen al hacer clic en un producto o causa)
+  // Unique zones present in returnRows
+  const uniqueZones = useMemo(() => {
+    const map = new Map<string, string>();
+    returnRows.forEach((r) => {
+      if (r.zoneId) map.set(r.zoneId, r.zoneName || r.zoneId);
+    });
+    return Array.from(map.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.id.localeCompare(b.id));
+  }, [returnRows]);
+
+  // Unique clients present in returnRows
+  const uniqueClients = useMemo(() => {
+    const set = new Set<string>();
+    returnRows.forEach((r) => {
+      const c = (r.clientName || '').trim();
+      if (c) set.add(c);
+    });
+    return Array.from(set).sort();
+  }, [returnRows]);
+
+  // Filas base invariantes (filtradas por Fecha, Lote, Zona y Cliente cuando se seleccionan)
   const basePeriodRows = useMemo(() => {
     return returnRows.filter((row) => {
       if (selectedDateFilter !== 'ALL' && row.date !== selectedDateFilter) {
         return false;
       }
       if (selectedLotFilter !== 'ALL' && row.lotNumber !== selectedLotFilter) {
+        return false;
+      }
+      if (selectedZoneFilter !== 'ALL' && row.zoneId !== selectedZoneFilter) {
+        return false;
+      }
+      if (
+        selectedClientFilter !== 'ALL' &&
+        row.clientName.trim() !== selectedClientFilter
+      ) {
         return false;
       }
       const qU =
@@ -161,7 +194,13 @@ export const ProductionEngineeringView: React.FC<
         row.causes.proxVencer + row.causes.vencido + row.causes.aCobrar;
       return qU + cU > 0;
     });
-  }, [returnRows, selectedDateFilter, selectedLotFilter]);
+  }, [
+    returnRows,
+    selectedDateFilter,
+    selectedLotFilter,
+    selectedZoneFilter,
+    selectedClientFilter,
+  ]);
 
   const filteredRows = useMemo(() => {
     return basePeriodRows.filter((row) => {
@@ -1461,7 +1500,47 @@ export const ProductionEngineeringView: React.FC<
         </div>
 
         {/* Search & Dropdown Filters */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2 border-t border-white/10">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2.5 pt-2 border-t border-white/10">
+          <div>
+            <label className="block text-[11px] font-medium text-indigo-300 mb-1">
+              Filtrar por Zona
+            </label>
+            <select
+              value={selectedZoneFilter}
+              onChange={(e) => setSelectedZoneFilter(e.target.value)}
+              className="w-full rounded-xl border border-white/15 bg-slate-900 px-3 py-2 text-xs text-white focus:border-indigo-400 focus:outline-none"
+            >
+              <option value="ALL">
+                Todas las Zonas ({uniqueZones.length})
+              </option>
+              {uniqueZones.map((z) => (
+                <option key={z.id} value={z.id}>
+                  {z.id} — {z.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-medium text-emerald-300 mb-1">
+              Filtrar por Cliente
+            </label>
+            <select
+              value={selectedClientFilter}
+              onChange={(e) => setSelectedClientFilter(e.target.value)}
+              className="w-full rounded-xl border border-white/15 bg-slate-900 px-3 py-2 text-xs text-white focus:border-emerald-400 focus:outline-none"
+            >
+              <option value="ALL">
+                Todos los Clientes ({uniqueClients.length})
+              </option>
+              {uniqueClients.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div>
             <label className="block text-[11px] font-medium text-slate-300 mb-1">
               Filtrar por Producto
@@ -1520,19 +1599,21 @@ export const ProductionEngineeringView: React.FC<
 
           <div>
             <label className="block text-[11px] font-medium text-slate-300 mb-1">
-              Búsqueda por Producto, Lote o Cliente
+              Búsqueda Rápida
             </label>
             <div className="flex gap-1.5">
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Ej. Chorizo Carla, 281, 290..."
+                placeholder="Producto, lote, cliente..."
                 className="w-full rounded-xl border border-white/15 bg-slate-900 px-3 py-2 text-xs text-white placeholder:text-slate-500 focus:border-indigo-400 focus:outline-none"
               />
               {(selectedProductFilter !== 'ALL' ||
                 selectedDateFilter !== 'ALL' ||
                 selectedLotFilter !== 'ALL' ||
+                selectedZoneFilter !== 'ALL' ||
+                selectedClientFilter !== 'ALL' ||
                 causeFilter !== 'ALL' ||
                 searchQuery) && (
                 <button
@@ -1541,6 +1622,8 @@ export const ProductionEngineeringView: React.FC<
                     setSelectedProductFilter('ALL');
                     setSelectedDateFilter('ALL');
                     setSelectedLotFilter('ALL');
+                    setSelectedZoneFilter('ALL');
+                    setSelectedClientFilter('ALL');
                     setCauseFilter('ALL');
                     setSearchQuery('');
                   }}

@@ -71,6 +71,17 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [dateFrom, setDateFrom] = useState<string>('');
   const [dateTo, setDateTo] = useState<string>('');
+  const [dashZoneFilter, setDashZoneFilter] = useState<string>('ALL');
+  const [dashClientFilter, setDashClientFilter] = useState<string>('ALL');
+  const [dashProductFilter, setDashProductFilter] = useState<string>('ALL');
+  const [dashLotFilter, setDashLotFilter] = useState<string>('ALL');
+  const [dashCauseFilter, setDashCauseFilter] = useState<
+    'ALL' | 'COMERCIAL' | 'CALIDAD' | ReturnCauseKey
+  >('ALL');
+  const [matrixSortBy, setMatrixSortBy] = useState<
+    'CODE_ASC' | 'SALES_DESC' | 'SALES_ASC' | 'TOTAL_DEV_DESC' | 'PCT_DESC' | 'COMM_DESC' | 'QUAL_DESC'
+  >('CODE_ASC');
+  const [salesRankingOrder, setSalesRankingOrder] = useState<'DESC' | 'ASC'>('DESC');
   const [escalafonOrder, setEscalafonOrder] = useState<'ASC' | 'DESC'>('ASC');
   const [escalafonCategory, setEscalafonCategory] = useState<
     'ALL' | 'COMERCIAL' | 'CALIDAD'
@@ -112,15 +123,90 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
   const effectiveDateTo = dateTo || maxDate;
   const isDateRangeActive = Boolean(dateFrom || dateTo);
 
-  // Filas filtradas por el rango de día a día seleccionado en la pantalla de inicio
+  // Listas de opciones únicas en todo el sistema para los filtros del Administrador
+  const dashboardFilterOptions = useMemo(() => {
+    const clientsMap = new Map<string, number>();
+    const productsMap = new Map<string, number>();
+    const lotsMap = new Map<string, number>();
+
+    for (const r of returnRows) {
+      if (dateFrom && r.date < dateFrom) continue;
+      if (dateTo && r.date > dateTo) continue;
+      if (dashZoneFilter !== 'ALL' && r.zoneId !== dashZoneFilter) continue;
+
+      const cName = (r.clientName || '').trim();
+      if (cName) clientsMap.set(cName, (clientsMap.get(cName) || 0) + r.qtyToReceive);
+
+      const pName = (r.productName || '').trim();
+      if (pName) productsMap.set(pName, (productsMap.get(pName) || 0) + r.qtyToReceive);
+
+      const lNum = (r.lotNumber || '').trim();
+      if (lNum && lNum !== 'S/L') lotsMap.set(lNum, (lotsMap.get(lNum) || 0) + r.qtyToReceive);
+    }
+
+    return {
+      clients: Array.from(clientsMap.entries())
+        .map(([name, units]) => ({ name, units }))
+        .sort((a, b) => b.units - a.units || a.name.localeCompare(b.name)),
+      products: Array.from(productsMap.entries())
+        .map(([name, units]) => ({ name, units }))
+        .sort((a, b) => b.units - a.units || a.name.localeCompare(b.name)),
+      lots: Array.from(lotsMap.entries())
+        .map(([lot, units]) => ({ lot, units }))
+        .sort((a, b) => b.units - a.units),
+    };
+  }, [returnRows, dateFrom, dateTo, dashZoneFilter]);
+
+  const hasAnyAdminFilter = Boolean(
+    dateFrom ||
+      dateTo ||
+      dashZoneFilter !== 'ALL' ||
+      dashClientFilter !== 'ALL' ||
+      dashProductFilter !== 'ALL' ||
+      dashLotFilter !== 'ALL' ||
+      dashCauseFilter !== 'ALL' ||
+      channelFilter !== 'ALL' ||
+      searchQuery.trim()
+  );
+
+  // Filas filtradas por todos los filtros activos del panel del Administrador (Sebastián)
   const dateFilteredRows = useMemo(() => {
-    if (!dateFrom && !dateTo) return returnRows;
     return returnRows.filter((r) => {
       if (dateFrom && r.date < dateFrom) return false;
       if (dateTo && r.date > dateTo) return false;
+      if (dashZoneFilter !== 'ALL' && r.zoneId !== dashZoneFilter) return false;
+      if (dashClientFilter !== 'ALL' && r.clientName.trim() !== dashClientFilter)
+        return false;
+      if (dashProductFilter !== 'ALL' && r.productName.trim() !== dashProductFilter)
+        return false;
+      if (dashLotFilter !== 'ALL' && r.lotNumber !== dashLotFilter) return false;
+      if (dashCauseFilter === 'COMERCIAL') {
+        if (r.causes.proxVencer + r.causes.vencido + r.causes.aCobrar <= 0)
+          return false;
+      } else if (dashCauseFilter === 'CALIDAD') {
+        if (
+          r.causes.vacio +
+            r.causes.lechozo +
+            r.causes.xFecha +
+            r.causes.abomba <=
+          0
+        )
+          return false;
+      } else if (dashCauseFilter !== 'ALL') {
+        if ((r.causes[dashCauseFilter] || 0) <= 0) return false;
+      }
       return true;
     });
-  }, [returnRows, dateFrom, dateTo]);
+  }, [
+    returnRows,
+    dateFrom,
+    dateTo,
+    dashZoneFilter,
+    dashClientFilter,
+    dashProductFilter,
+    dashLotFilter,
+    dashCauseFilter,
+  ]);
 
   const enrichedZones = useMemo(() => {
     const activeZones = zones.filter((z) => z.id !== 'Z15');
@@ -184,8 +270,18 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
   }, [zones, dateFilteredRows, isDateRangeActive]);
 
   const filteredZones = useMemo(() => {
-    return enrichedZones.filter((z) => {
+    const base = enrichedZones.filter((z) => {
       if (channelFilter !== 'ALL' && z.type !== channelFilter) return false;
+      if (dashZoneFilter !== 'ALL' && z.id !== dashZoneFilter) return false;
+      if (
+        (dashClientFilter !== 'ALL' ||
+          dashProductFilter !== 'ALL' ||
+          dashLotFilter !== 'ALL' ||
+          dashCauseFilter !== 'ALL') &&
+        z.lineItemsCount === 0
+      ) {
+        return false;
+      }
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         return (
@@ -197,7 +293,31 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
       }
       return true;
     });
-  }, [enrichedZones, channelFilter, searchQuery]);
+
+    return [...base].sort((a, b) => {
+      if (matrixSortBy === 'SALES_DESC')
+        return b.monthlySalesCOP - a.monthlySalesCOP;
+      if (matrixSortBy === 'SALES_ASC')
+        return a.monthlySalesCOP - b.monthlySalesCOP;
+      if (matrixSortBy === 'TOTAL_DEV_DESC') return b.totalCOP - a.totalCOP;
+      if (matrixSortBy === 'PCT_DESC')
+        return b.pctTotalOverSales - a.pctTotalOverSales;
+      if (matrixSortBy === 'COMM_DESC')
+        return b.commercialCOP - a.commercialCOP;
+      if (matrixSortBy === 'QUAL_DESC') return b.qualityCOP - a.qualityCOP;
+      return a.code.localeCompare(b.code);
+    });
+  }, [
+    enrichedZones,
+    channelFilter,
+    dashZoneFilter,
+    dashClientFilter,
+    dashProductFilter,
+    dashLotFilter,
+    dashCauseFilter,
+    searchQuery,
+    matrixSortBy,
+  ]);
 
   const totals = useMemo(() => {
     const acc = {
@@ -393,19 +513,24 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
     };
   }, [dateFilteredRows, escalafonOrder, escalafonCategory]);
 
-  // Zona que MÁS vende y zona que MENOS vende
+  // Ranking completo de TODAS las zonas según sus ventas mensuales (de mayor a menor o menor a mayor)
   const zoneSalesRanking = useMemo(() => {
-    const rutas = enrichedZones.filter(
-      (z) => z.type === 'RUTA_VENDEDOR' && z.monthlySalesCOP > 0
-    );
-    const bySales = [...rutas].sort(
+    const rutas = enrichedZones.filter((z) => z.monthlySalesCOP > 0);
+    const bySalesDesc = [...rutas].sort(
       (a, b) => b.monthlySalesCOP - a.monthlySalesCOP
     );
+    const orderedAll =
+      salesRankingOrder === 'DESC'
+        ? bySalesDesc
+        : [...bySalesDesc].reverse();
+    const maxSales = bySalesDesc[0]?.monthlySalesCOP || 1;
     return {
-      topZone: bySales[0] || null,
-      bottomZone: bySales[bySales.length - 1] || null,
+      topZone: bySalesDesc[0] || null,
+      bottomZone: bySalesDesc[bySalesDesc.length - 1] || null,
+      allZonesRanked: orderedAll,
+      maxSales,
     };
-  }, [enrichedZones]);
+  }, [enrichedZones, salesRankingOrder]);
 
   const topLots = useMemo(() => {
     const map = new Map<
@@ -534,121 +659,269 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
         </div>
       </div>
 
-      {/* Barra de Corte de Fecha y Filtro por Rango de Día a Día en la Pantalla de Inicio (Sebastián) */}
-      <div className="rounded-2xl border border-emerald-500/30 bg-slate-900/80 backdrop-blur-xl p-3.5 sm:px-5 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between shadow-lg">
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/20 border border-emerald-400/30 text-emerald-300">
-            <Calendar className="h-4 w-4" />
-          </div>
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-bold text-white">
-                Corte en Sistema: {maxDate} · Rango Día a Día:
-              </span>
-              <span className="rounded-lg bg-emerald-500/25 border border-emerald-400/40 px-2.5 py-0.5 font-mono text-xs font-extrabold text-emerald-300">
-                Del {effectiveDateFrom} al {effectiveDateTo}
-              </span>
+      {/* Barra de Corte de Fecha y Centro Completo de Filtros en la Pantalla del Administrador (Sebastián) */}
+      <div className="rounded-2xl border border-emerald-500/30 bg-slate-900/90 p-4 sm:px-5 space-y-3.5 shadow-lg">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/20 border border-emerald-400/30 text-emerald-300">
+              <Calendar className="h-4 w-4" />
             </div>
-            <p className="text-[11px] text-slate-300">
-              Elige el rango de días a consultar (por ejemplo, del día 1 al 17 sin incluir el 18) para actualizar todas las zonas y paneles.
-            </p>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-1.5 rounded-xl border border-white/15 bg-slate-950/80 px-2.5 py-1.5">
-            <span className="text-[11px] font-bold text-emerald-300">
-              Desde:
-            </span>
-            <select
-              value={dateFrom || minDate}
-              onChange={(e) => {
-                const val = e.target.value;
-                setDateFrom(val);
-                if (dateTo && val > dateTo) setDateTo(val);
-              }}
-              className="bg-transparent font-mono text-xs font-bold text-white focus:outline-none cursor-pointer"
-            >
-              {availableDatesChronological.map((d) => (
-                <option key={`dash-from-${d}`} value={d} className="bg-slate-900 text-white">
-                  Día {d.slice(8, 10)} ({d})
-                </option>
-              ))}
-            </select>
-            <input
-              type="date"
-              value={dateFrom || minDate}
-              onChange={(e) => {
-                const val = e.target.value;
-                setDateFrom(val);
-                if (dateTo && val > dateTo) setDateTo(val);
-              }}
-              className="w-6 bg-transparent text-xs text-emerald-300 focus:outline-none cursor-pointer"
-            />
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-bold text-white">
+                  Centro de Filtros Gerenciales (Sebastián) · Corte: {maxDate}
+                </span>
+                <span className="rounded-lg bg-emerald-500/25 border border-emerald-400/40 px-2.5 py-0.5 font-mono text-xs font-extrabold text-emerald-300">
+                  Del {effectiveDateFrom} al {effectiveDateTo}
+                </span>
+                {dashZoneFilter !== 'ALL' && (
+                  <Badge variant="indigo" dot>
+                    Zona: {dashZoneFilter}
+                  </Badge>
+                )}
+                {dashClientFilter !== 'ALL' && (
+                  <Badge variant="success" dot>
+                    Cliente: {dashClientFilter}
+                  </Badge>
+                )}
+              </div>
+              <p className="text-[11px] text-slate-300">
+                Filtra todo el sistema por <strong>Rango de Día a Día</strong>, <strong>Zona</strong>, <strong>Cliente</strong>, <strong>Producto</strong>, <strong>Lote</strong> o <strong>Causa</strong>. Todos los paneles y tablas se actualizan al instante.
+              </p>
+            </div>
           </div>
 
-          <div className="flex items-center gap-1.5 rounded-xl border border-white/15 bg-slate-950/80 px-2.5 py-1.5">
-            <span className="text-[11px] font-bold text-amber-300">
-              Hasta:
-            </span>
-            <select
-              value={dateTo || maxDate}
-              onChange={(e) => {
-                const val = e.target.value;
-                setDateTo(val);
-                if (dateFrom && val < dateFrom) setDateFrom(val);
-              }}
-              className="bg-transparent font-mono text-xs font-bold text-white focus:outline-none cursor-pointer"
-            >
-              {availableDatesChronological.map((d) => (
-                <option key={`dash-to-${d}`} value={d} className="bg-slate-900 text-white">
-                  Día {d.slice(8, 10)} ({d})
-                </option>
-              ))}
-            </select>
-            <input
-              type="date"
-              value={dateTo || maxDate}
-              onChange={(e) => {
-                const val = e.target.value;
-                setDateTo(val);
-                if (dateFrom && val < dateFrom) setDateFrom(val);
-              }}
-              className="w-6 bg-transparent text-xs text-amber-300 focus:outline-none cursor-pointer"
-            />
-          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1.5 rounded-xl border border-white/15 bg-slate-950/85 px-2.5 py-1.5">
+              <span className="text-[11px] font-bold text-emerald-300">
+                Desde:
+              </span>
+              <select
+                value={dateFrom || minDate}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setDateFrom(val);
+                  if (dateTo && val > dateTo) setDateTo(val);
+                }}
+                className="bg-transparent font-mono text-xs font-bold text-white focus:outline-none cursor-pointer"
+              >
+                {availableDatesChronological.map((d) => (
+                  <option key={`dash-from-${d}`} value={d} className="bg-slate-900 text-white">
+                    Día {d.slice(8, 10)} ({d})
+                  </option>
+                ))}
+              </select>
+              <input
+                type="date"
+                value={dateFrom || minDate}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setDateFrom(val);
+                  if (dateTo && val > dateTo) setDateTo(val);
+                }}
+                className="w-6 bg-transparent text-xs text-emerald-300 focus:outline-none cursor-pointer"
+              />
+            </div>
 
-          {availableDatesChronological.length >= 2 && (
+            <div className="flex items-center gap-1.5 rounded-xl border border-white/15 bg-slate-950/85 px-2.5 py-1.5">
+              <span className="text-[11px] font-bold text-amber-300">
+                Hasta:
+              </span>
+              <select
+                value={dateTo || maxDate}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setDateTo(val);
+                  if (dateFrom && val < dateFrom) setDateFrom(val);
+                }}
+                className="bg-transparent font-mono text-xs font-bold text-white focus:outline-none cursor-pointer"
+              >
+                {availableDatesChronological.map((d) => (
+                  <option key={`dash-to-${d}`} value={d} className="bg-slate-900 text-white">
+                    Día {d.slice(8, 10)} ({d})
+                  </option>
+                ))}
+              </select>
+              <input
+                type="date"
+                value={dateTo || maxDate}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setDateTo(val);
+                  if (dateFrom && val < dateFrom) setDateFrom(val);
+                }}
+                className="w-6 bg-transparent text-xs text-amber-300 focus:outline-none cursor-pointer"
+              />
+            </div>
+
+            {availableDatesChronological.length >= 2 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setDateFrom(minDate);
+                  setDateTo(secondToLastDate);
+                }}
+                className={`rounded-xl px-3 py-1.5 text-xs font-bold transition-all ${
+                  dateFrom === minDate && dateTo === secondToLastDate
+                    ? 'bg-amber-500 text-slate-950 shadow-sm'
+                    : 'bg-amber-500/15 text-amber-300 border border-amber-500/30 hover:bg-amber-500/25'
+                }`}
+              >
+                Sin el último día (Día {minDate.slice(8, 10)} al {secondToLastDate.slice(8, 10)})
+              </button>
+            )}
+
             <button
               type="button"
               onClick={() => {
-                setDateFrom(minDate);
-                setDateTo(secondToLastDate);
+                setDateFrom('');
+                setDateTo('');
               }}
-              className={`rounded-xl px-3 py-1.5 text-xs font-bold transition-all ${
-                dateFrom === minDate && dateTo === secondToLastDate
-                  ? 'bg-amber-500 text-slate-950 shadow-sm'
-                  : 'bg-amber-500/15 text-amber-300 border border-amber-500/30 hover:bg-amber-500/25'
+              className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
+                !isDateRangeActive
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'bg-slate-800/90 text-slate-300 hover:text-white border border-white/10'
               }`}
             >
-              Sin el último día (Día {minDate.slice(8, 10)} al {secondToLastDate.slice(8, 10)})
+              Todos los Días ({availableDates.length})
             </button>
-          )}
 
-          <button
-            type="button"
-            onClick={() => {
-              setDateFrom('');
-              setDateTo('');
-            }}
-            className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
-              !isDateRangeActive
-                ? 'bg-emerald-600 text-white shadow-sm'
-                : 'bg-slate-800/90 text-slate-300 hover:text-white border border-white/10'
-            }`}
-          >
-            Todos los Días ({availableDates.length})
-          </button>
+            {hasAnyAdminFilter && (
+              <button
+                type="button"
+                onClick={() => {
+                  setDateFrom('');
+                  setDateTo('');
+                  setDashZoneFilter('ALL');
+                  setDashClientFilter('ALL');
+                  setDashProductFilter('ALL');
+                  setDashLotFilter('ALL');
+                  setDashCauseFilter('ALL');
+                  setChannelFilter('ALL');
+                  setSearchQuery('');
+                }}
+                className="rounded-xl border border-rose-500/40 bg-rose-500/15 hover:bg-rose-500/25 px-3 py-1.5 text-xs font-bold text-rose-300 transition-all"
+              >
+                ✕ Limpiar Todos los Filtros
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Segunda fila de filtros gerenciales: Zona, Cliente, Producto, Lote y Causa */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5 pt-3 border-t border-white/10">
+          {/* Filtro por Zona */}
+          <div>
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-indigo-300 mb-1">
+              📍 Filtrar por Zona Comercial
+            </label>
+            <select
+              value={dashZoneFilter}
+              onChange={(e) => setDashZoneFilter(e.target.value)}
+              className="w-full rounded-xl border border-indigo-500/35 bg-slate-950/90 px-2.5 py-1.5 text-xs font-semibold text-white focus:border-indigo-400 focus:outline-none"
+            >
+              <option value="ALL">
+                Todas las Zonas ({enrichedZones.length})
+              </option>
+              {enrichedZones.map((z) => (
+                <option key={z.id} value={z.id}>
+                  {z.code} — {z.consolidatedName} ({formatCompactCOP(z.monthlySalesCOP)})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Filtro por Cliente */}
+          <div>
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-emerald-300 mb-1">
+              👤 Filtrar por Cliente / Sede
+            </label>
+            <select
+              value={dashClientFilter}
+              onChange={(e) => setDashClientFilter(e.target.value)}
+              className="w-full rounded-xl border border-emerald-500/35 bg-slate-950/90 px-2.5 py-1.5 text-xs font-semibold text-white focus:border-emerald-400 focus:outline-none"
+            >
+              <option value="ALL">
+                Todos los Clientes ({dashboardFilterOptions.clients.length})
+              </option>
+              {dashboardFilterOptions.clients.map((c) => (
+                <option key={c.name} value={c.name}>
+                  {c.name} ({c.units} unds)
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Filtro por Producto */}
+          <div>
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-sky-300 mb-1">
+              📦 Filtrar por Producto
+            </label>
+            <select
+              value={dashProductFilter}
+              onChange={(e) => setDashProductFilter(e.target.value)}
+              className="w-full rounded-xl border border-sky-500/35 bg-slate-950/90 px-2.5 py-1.5 text-xs font-semibold text-white focus:border-sky-400 focus:outline-none"
+            >
+              <option value="ALL">
+                Todos los Productos ({dashboardFilterOptions.products.length})
+              </option>
+              {dashboardFilterOptions.products.map((p) => (
+                <option key={p.name} value={p.name}>
+                  {p.name} ({p.units} unds)
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Filtro por Lote */}
+          <div>
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-violet-300 mb-1">
+              🏷️ Filtrar por N° de Lote
+            </label>
+            <select
+              value={dashLotFilter}
+              onChange={(e) => setDashLotFilter(e.target.value)}
+              className="w-full rounded-xl border border-violet-500/35 bg-slate-950/90 px-2.5 py-1.5 font-mono text-xs font-semibold text-white focus:border-violet-400 focus:outline-none"
+            >
+              <option value="ALL">
+                Todos los Lotes ({dashboardFilterOptions.lots.length})
+              </option>
+              {dashboardFilterOptions.lots.map((l) => (
+                <option key={l.lot} value={l.lot}>
+                  Lote #{l.lot} ({l.units} unds)
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Filtro por Causa / Responsabilidad */}
+          <div>
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-amber-300 mb-1">
+              🔬 Filtrar por Causa / Área
+            </label>
+            <select
+              value={dashCauseFilter}
+              onChange={(e) =>
+                setDashCauseFilter(
+                  e.target.value as
+                    | 'ALL'
+                    | 'COMERCIAL'
+                    | 'CALIDAD'
+                    | ReturnCauseKey
+                )
+              }
+              className="w-full rounded-xl border border-amber-500/35 bg-slate-950/90 px-2.5 py-1.5 text-xs font-semibold text-white focus:border-amber-400 focus:outline-none"
+            >
+              <option value="ALL">Todas las Causas (Comercial + Calidad)</option>
+              <option value="COMERCIAL">🟠 Solo Comercial (Próx. + Vencido + Cobrar)</option>
+              <option value="CALIDAD">🔵 Solo Calidad (Vacío + Lechoso + Fecha + Emb.)</option>
+              {CAUSE_METADATA.map((c) => (
+                <option key={c.key} value={c.key}>
+                  • {c.fullLabel} ({c.responsibility})
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
@@ -960,36 +1233,80 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
             </div>
           </div>
 
-          {/* 3 Tarjetas de Resumen Rápido: Ventas por Zona, Críticos Lechosidad/Vacío y Comercial */}
+          {/* 3 Tarjetas de Resumen Rápido: Ranking Completo de Todas las Zonas por Ventas, Críticos Lechosidad/Vacío y Comercial */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div className="rounded-2xl border border-emerald-500/30 bg-slate-900/90 p-3.5 space-y-1.5">
-              <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-emerald-400">
+            <div className="rounded-2xl border border-emerald-500/30 bg-slate-900/95 p-3.5 space-y-2">
+              <div className="flex items-center justify-between gap-2 text-[11px] font-bold uppercase tracking-wider text-emerald-400">
                 <span className="flex items-center gap-1">
-                  <Award className="h-3.5 w-3.5" />
-                  ¿Qué Zona Vende Más y Cuál Menos?
+                  <Award className="h-3.5 w-3.5 shrink-0" />
+                  Ranking Ventas por Zona ({zoneSalesRanking.allZonesRanked.length} Zonas)
                 </span>
-                <span>Ventas Mes</span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSalesRankingOrder((prev) =>
+                      prev === 'DESC' ? 'ASC' : 'DESC'
+                    )
+                  }
+                  className="rounded-lg border border-emerald-500/35 bg-emerald-500/15 hover:bg-emerald-500/25 px-2 py-0.5 text-[10px] font-bold text-emerald-300 transition-colors shrink-0"
+                  title="Cambiar orden de Mayor a Menor / Menor a Mayor"
+                >
+                  {salesRankingOrder === 'DESC' ? 'Mayor → Menor ↓' : 'Menor → Mayor ↑'}
+                </button>
               </div>
-              {zoneSalesRanking.topZone && (
-                <div className="flex items-center justify-between text-xs pt-1">
-                  <span className="text-slate-200 truncate">
-                    🏆 <strong>Más vende:</strong> {zoneSalesRanking.topZone.consolidatedName}
-                  </span>
-                  <span className="font-mono font-bold text-emerald-300 shrink-0 ml-2">
-                    {formatCompactCOP(zoneSalesRanking.topZone.monthlySalesCOP)}
-                  </span>
-                </div>
-              )}
-              {zoneSalesRanking.bottomZone && (
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-300 truncate">
-                    📉 <strong>Menos vende:</strong> {zoneSalesRanking.bottomZone.consolidatedName}
-                  </span>
-                  <span className="font-mono font-bold text-amber-300 shrink-0 ml-2">
-                    {formatCompactCOP(zoneSalesRanking.bottomZone.monthlySalesCOP)}
-                  </span>
-                </div>
-              )}
+
+              {/* Lista completa desplazable de TODAS las zonas con sus ventas y porcentaje de devolución */}
+              <div className="max-h-48 overflow-y-auto pr-1 space-y-1.5 divide-y divide-white/[0.06]">
+                {zoneSalesRanking.allZonesRanked.map((z, index) => {
+                  const rankNum =
+                    salesRankingOrder === 'DESC'
+                      ? index + 1
+                      : zoneSalesRanking.allZonesRanked.length - index;
+                  const barPct = Math.max(
+                    6,
+                    Math.round((z.monthlySalesCOP / zoneSalesRanking.maxSales) * 100)
+                  );
+                  const isSelectedZone = dashZoneFilter === z.id;
+                  return (
+                    <button
+                      key={z.id}
+                      type="button"
+                      onClick={() =>
+                        setDashZoneFilter((prev) => (prev === z.id ? 'ALL' : z.id))
+                      }
+                      className={`w-full text-left pt-1.5 first:pt-0 rounded-lg px-1.5 py-1 transition-colors ${
+                        isSelectedZone
+                          ? 'bg-emerald-500/20 ring-1 ring-emerald-400'
+                          : 'hover:bg-white/[0.05]'
+                      }`}
+                      title={`Clic para filtrar todo el dashboard por ${z.consolidatedName}`}
+                    >
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-200 truncate font-medium">
+                          <span className="font-mono text-[10px] font-bold text-emerald-400 mr-1.5">
+                            #{rankNum}
+                          </span>
+                          {z.consolidatedName}
+                        </span>
+                        <div className="flex items-center gap-2 shrink-0 ml-2">
+                          <span className="font-mono font-bold text-emerald-300">
+                            {formatCompactCOP(z.monthlySalesCOP)}
+                          </span>
+                          <span className="font-mono text-[10px] text-slate-400">
+                            ({formatPercent(z.pctTotalOverSales)} dev)
+                          </span>
+                        </div>
+                      </div>
+                      <div className="mt-1 h-1.5 w-full rounded-full bg-slate-800 overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400"
+                          style={{ width: `${barPct}%` }}
+                        />
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             <div className="rounded-2xl border border-sky-500/30 bg-slate-900/90 p-3.5 space-y-1.5">
@@ -1212,7 +1529,7 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
             </div>
 
             <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2.5 w-full lg:w-auto shrink-0">
-              <div className="relative w-full sm:w-56">
+              <div className="relative w-full sm:w-52">
                 <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-neutral-400" />
                 <input
                   type="text"
@@ -1222,6 +1539,31 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
                   className="w-full rounded-xl border border-neutral-300 dark:border-white/15 bg-white/80 dark:bg-slate-950/75 pl-8 pr-3 py-1.5 text-xs text-neutral-900 dark:text-white placeholder:text-neutral-400 focus:border-indigo-500 focus:outline-none"
                 />
               </div>
+
+              <select
+                value={matrixSortBy}
+                onChange={(e) =>
+                  setMatrixSortBy(
+                    e.target.value as
+                      | 'CODE_ASC'
+                      | 'SALES_DESC'
+                      | 'SALES_ASC'
+                      | 'TOTAL_DEV_DESC'
+                      | 'PCT_DESC'
+                      | 'COMM_DESC'
+                      | 'QUAL_DESC'
+                  )
+                }
+                className="rounded-xl border border-neutral-300 dark:border-white/15 bg-white/90 dark:bg-slate-950/85 px-3 py-1.5 text-xs font-semibold text-neutral-900 dark:text-white focus:border-indigo-500 focus:outline-none"
+              >
+                <option value="CODE_ASC">Orden: Por Código de Zona (Z01→Z16)</option>
+                <option value="SALES_DESC">Orden: Zonas que MÁS Venden ↓</option>
+                <option value="SALES_ASC">Orden: Zonas que MENOS Venden ↑</option>
+                <option value="TOTAL_DEV_DESC">Orden: Mayor Total Devolución ($) ↓</option>
+                <option value="PCT_DESC">Orden: Mayor % Incidencia sobre Ventas ↓</option>
+                <option value="COMM_DESC">Orden: Mayor Devolución Comercial ↓</option>
+                <option value="QUAL_DESC">Orden: Mayor Devolución Calidad ↓</option>
+              </select>
 
               <div className="inline-flex rounded-xl border border-neutral-300 dark:border-white/15 bg-neutral-100/80 dark:bg-slate-950/80 p-0.5">
                 <button

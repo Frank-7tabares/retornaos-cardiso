@@ -136,6 +136,11 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
   const [forceTableOnMobile, setForceTableOnMobile] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [lotFilter, setLotFilter] = useState<string>('ALL');
+  const [clientFilter, setClientFilter] = useState<string>('ALL');
+  const [productFilter, setProductFilter] = useState<string>('ALL');
+  const [expiryFilter, setExpiryFilter] = useState<string>('ALL');
+  const [invoiceFilter, setInvoiceFilter] = useState<'ALL' | 'WITH_INVOICE' | 'WITHOUT_INVOICE'>('ALL');
+  const [sortOrder, setSortOrder] = useState<'DATE_DESC' | 'DATE_ASC' | 'COP_DESC' | 'COP_ASC' | 'UNITS_DESC' | 'CLIENT_ASC'>('DATE_DESC');
   const [dateFrom, setDateFrom] = useState<string>('');
   const [dateTo, setDateTo] = useState<string>('');
   const [causeFilter, setCauseFilter] = useState<
@@ -248,6 +253,76 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
     return Array.from(map.values()).sort((a, b) => b.units - a.units);
   }, [returnRows, activeZone, searchAllZonesForLot]);
 
+  // Extract all unique Clients available across rows in this zone
+  const availableClients = useMemo(() => {
+    const map = new Map<string, { client: string; count: number; units: number; cop: number }>();
+    const sourceRows = searchAllZonesForLot
+      ? returnRows
+      : returnRows.filter((r) => !activeZone || r.zoneId === activeZone.id);
+
+    for (const r of sourceRows) {
+      const name = (r.clientName || '').trim();
+      if (!name) continue;
+      const prev = map.get(name) || {
+        client: name,
+        count: 0,
+        units: 0,
+        cop: 0,
+      };
+      prev.count += 1;
+      prev.units += r.qtyToReceive;
+      prev.cop += r.totalValueCOP;
+      map.set(name, prev);
+    }
+    return Array.from(map.values()).sort((a, b) => b.units - a.units || a.client.localeCompare(b.client));
+  }, [returnRows, activeZone, searchAllZonesForLot]);
+
+  // Extract all unique Products available across rows in this zone
+  const availableProducts = useMemo(() => {
+    const map = new Map<string, { product: string; count: number; units: number; cop: number }>();
+    const sourceRows = searchAllZonesForLot
+      ? returnRows
+      : returnRows.filter((r) => !activeZone || r.zoneId === activeZone.id);
+
+    for (const r of sourceRows) {
+      const name = (r.productName || '').trim();
+      if (!name) continue;
+      const prev = map.get(name) || {
+        product: name,
+        count: 0,
+        units: 0,
+        cop: 0,
+      };
+      prev.count += 1;
+      prev.units += r.qtyToReceive;
+      prev.cop += r.totalValueCOP;
+      map.set(name, prev);
+    }
+    return Array.from(map.values()).sort((a, b) => b.units - a.units || a.product.localeCompare(b.product));
+  }, [returnRows, activeZone, searchAllZonesForLot]);
+
+  // Extract all unique Expiry Dates available across rows in this zone
+  const availableExpiries = useMemo(() => {
+    const map = new Map<string, { expiry: string; count: number; units: number }>();
+    const sourceRows = searchAllZonesForLot
+      ? returnRows
+      : returnRows.filter((r) => !activeZone || r.zoneId === activeZone.id);
+
+    for (const r of sourceRows) {
+      const exp = (r.productExpiryDate || '').trim();
+      if (!exp || exp === 'S/F') continue;
+      const prev = map.get(exp) || {
+        expiry: exp,
+        count: 0,
+        units: 0,
+      };
+      prev.count += 1;
+      prev.units += r.qtyToReceive;
+      map.set(exp, prev);
+    }
+    return Array.from(map.values()).sort((a, b) => a.expiry.localeCompare(b.expiry));
+  }, [returnRows, activeZone, searchAllZonesForLot]);
+
   // Extract all unique Dates available across rows (sorted oldest to newest for day-to-day range)
   const availableDatesChronological = useMemo(() => {
     const map = new Map<string, { date: string; count: number; units: number }>();
@@ -291,6 +366,10 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
   const handleSelectZone = (newZoneId: string) => {
     if (newZoneId === selectedZoneId) return;
     setVisibleLimit(80);
+    setClientFilter('ALL');
+    setProductFilter('ALL');
+    setExpiryFilter('ALL');
+    setInvoiceFilter('ALL');
     onChangeZoneId(newZoneId);
   };
 
@@ -322,14 +401,31 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
     returnRows,
   ]);
 
-  // Filas de la zona filtradas por Rango de Día a Día, Lote, Estado y Búsqueda (actualiza los 4 paneles superiores)
+  // Filas de la zona filtradas por Rango de Día a Día, Cliente, Producto, Lote, Vencimiento, Factura, Estado y Búsqueda (actualiza los 4 paneles superiores)
   const baseZoneRows = useMemo(() => {
     if (!activeZone) return [];
     return returnRows.filter((r) => {
       if (!searchAllZonesForLot && r.zoneId !== activeZone.id) return false;
       if (dateFrom && r.date < dateFrom) return false;
       if (dateTo && r.date > dateTo) return false;
+      if (clientFilter !== 'ALL' && r.clientName.trim() !== clientFilter)
+        return false;
+      if (productFilter !== 'ALL' && r.productName.trim() !== productFilter)
+        return false;
       if (lotFilter !== 'ALL' && r.lotNumber !== lotFilter) return false;
+      if (expiryFilter !== 'ALL' && r.productExpiryDate.trim() !== expiryFilter)
+        return false;
+      if (invoiceFilter === 'WITH_INVOICE') {
+        const hasInv =
+          Boolean(r.invoiceRef && r.invoiceRef.trim()) ||
+          Boolean(r.observations && r.observations.trim());
+        if (!hasInv) return false;
+      } else if (invoiceFilter === 'WITHOUT_INVOICE') {
+        const hasInv =
+          Boolean(r.invoiceRef && r.invoiceRef.trim()) ||
+          Boolean(r.observations && r.observations.trim());
+        if (hasInv) return false;
+      }
       if (statusFilter !== 'ALL' && r.reconciliationStatus !== statusFilter)
         return false;
       if (searchQuery.trim()) {
@@ -350,18 +446,17 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
     searchAllZonesForLot,
     dateFrom,
     dateTo,
+    clientFilter,
+    productFilter,
     lotFilter,
+    expiryFilter,
+    invoiceFilter,
     statusFilter,
     searchQuery,
   ]);
 
   const zoneRows = useMemo(() => {
-    if (!activeZone) return [];
-    return returnRows.filter((r) => {
-      if (!searchAllZonesForLot && r.zoneId !== activeZone.id) return false;
-      if (dateFrom && r.date < dateFrom) return false;
-      if (dateTo && r.date > dateTo) return false;
-      if (lotFilter !== 'ALL' && r.lotNumber !== lotFilter) return false;
+    const filtered = baseZoneRows.filter((r) => {
       if (causeFilter === 'PROX_VENCER_GROUP') {
         if (r.causes.proxVencer + r.causes.vencido <= 0) return false;
       } else if (causeFilter === 'CALIDAD_GROUP') {
@@ -376,31 +471,19 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
       } else if (causeFilter !== 'ALL' && r.causes[causeFilter] <= 0) {
         return false;
       }
-      if (statusFilter !== 'ALL' && r.reconciliationStatus !== statusFilter)
-        return false;
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        return (
-          r.clientName.toLowerCase().includes(q) ||
-          r.productName.toLowerCase().includes(q) ||
-          r.lotNumber.toLowerCase().includes(q) ||
-          r.observations.toLowerCase().includes(q) ||
-          r.zoneName.toLowerCase().includes(q)
-        );
-      }
       return true;
     });
-  }, [
-    returnRows,
-    activeZone,
-    searchAllZonesForLot,
-    dateFrom,
-    dateTo,
-    lotFilter,
-    causeFilter,
-    statusFilter,
-    searchQuery,
-  ]);
+
+    return [...filtered].sort((a, b) => {
+      if (sortOrder === 'DATE_ASC') return a.date.localeCompare(b.date);
+      if (sortOrder === 'COP_DESC') return b.totalValueCOP - a.totalValueCOP;
+      if (sortOrder === 'COP_ASC') return a.totalValueCOP - b.totalValueCOP;
+      if (sortOrder === 'UNITS_DESC') return b.qtyToReceive - a.qtyToReceive;
+      if (sortOrder === 'CLIENT_ASC')
+        return a.clientName.localeCompare(b.clientName);
+      return b.date.localeCompare(a.date);
+    });
+  }, [baseZoneRows, causeFilter, sortOrder]);
 
   // Reset visible limit when filters change for ultra-fast rendering
   useEffect(() => {
@@ -410,10 +493,15 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
     searchAllZonesForLot,
     dateFrom,
     dateTo,
+    clientFilter,
+    productFilter,
     lotFilter,
+    expiryFilter,
+    invoiceFilter,
     causeFilter,
     statusFilter,
     searchQuery,
+    sortOrder,
   ]);
 
   const visibleZoneRows = useMemo(
@@ -1215,7 +1303,11 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
             </select>
 
             {(isDateRangeActive ||
+              clientFilter !== 'ALL' ||
+              productFilter !== 'ALL' ||
               lotFilter !== 'ALL' ||
+              expiryFilter !== 'ALL' ||
+              invoiceFilter !== 'ALL' ||
               causeFilter !== 'ALL' ||
               searchAllZonesForLot) && (
               <button
@@ -1223,7 +1315,11 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
                 onClick={() => {
                   setDateFrom('');
                   setDateTo('');
+                  setClientFilter('ALL');
+                  setProductFilter('ALL');
                   setLotFilter('ALL');
+                  setExpiryFilter('ALL');
+                  setInvoiceFilter('ALL');
                   setCauseFilter('ALL');
                   setSearchAllZonesForLot(false);
                   if (onClearExternalLotFilter) onClearExternalLotFilter();
@@ -1231,11 +1327,208 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
                 className="inline-flex items-center justify-center gap-1 rounded-xl border border-rose-500/30 bg-rose-500/15 px-3 py-1.5 text-xs font-medium text-rose-400 hover:bg-rose-500/25"
               >
                 <X className="h-3.5 w-3.5" />
-                Limpiar
+                Limpiar Todos los Filtros
               </button>
             )}
           </div>
         </div>
+
+        {/* Row 2 of Filters: Cliente (Col B), Producto (Col C), Vencimiento (Col F), Factura/Nota (Col P) y Orden */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5 pt-2 border-t border-neutral-200/70 dark:border-white/10">
+          {/* 1. Filtro por Cliente / Sede (Col B) */}
+          <div className="space-y-1">
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-emerald-400">
+              👤 Filtrar por Cliente / Sede (Col B)
+            </label>
+            <select
+              value={clientFilter}
+              onChange={(e) => setClientFilter(e.target.value)}
+              className="w-full rounded-xl border border-emerald-500/35 bg-slate-950/85 px-2.5 py-1.5 text-xs font-semibold text-white focus:border-emerald-400 focus:outline-none"
+            >
+              <option value="ALL">
+                Todos los Clientes ({availableClients.length})
+              </option>
+              {availableClients.map((c) => (
+                <option key={c.client} value={c.client}>
+                  {c.client} ({c.units}u · {formatCOP(c.cop)})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* 2. Filtro por Producto / Referencia (Col C) */}
+          <div className="space-y-1">
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-sky-400">
+              📦 Filtrar por Producto (Col C)
+            </label>
+            <select
+              value={productFilter}
+              onChange={(e) => setProductFilter(e.target.value)}
+              className="w-full rounded-xl border border-sky-500/35 bg-slate-950/85 px-2.5 py-1.5 text-xs font-semibold text-white focus:border-sky-400 focus:outline-none"
+            >
+              <option value="ALL">
+                Todos los Productos ({availableProducts.length})
+              </option>
+              {availableProducts.map((p) => (
+                <option key={p.product} value={p.product}>
+                  {p.product} ({p.units}u · {formatCOP(p.cop)})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* 3. Filtro por Fecha de Vencimiento del Producto (Col F) */}
+          <div className="space-y-1">
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-violet-300">
+              ⏳ Fecha Vencimiento (Col F)
+            </label>
+            <select
+              value={expiryFilter}
+              onChange={(e) => setExpiryFilter(e.target.value)}
+              className="w-full rounded-xl border border-violet-500/35 bg-slate-950/85 px-2.5 py-1.5 font-mono text-xs font-semibold text-white focus:border-violet-400 focus:outline-none"
+            >
+              <option value="ALL">
+                Todos los Vencimientos ({availableExpiries.length})
+              </option>
+              {availableExpiries.map((ex) => (
+                <option key={ex.expiry} value={ex.expiry}>
+                  Vence: {ex.expiry} ({ex.units}u · {ex.count} reg.)
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* 4. Filtro por Factura / Observación (Col P) */}
+          <div className="space-y-1">
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-amber-300">
+              🧾 Factura / Observación (Col P)
+            </label>
+            <select
+              value={invoiceFilter}
+              onChange={(e) =>
+                setInvoiceFilter(
+                  e.target.value as 'ALL' | 'WITH_INVOICE' | 'WITHOUT_INVOICE'
+                )
+              }
+              className="w-full rounded-xl border border-amber-500/35 bg-slate-950/85 px-2.5 py-1.5 text-xs font-semibold text-white focus:border-amber-400 focus:outline-none"
+            >
+              <option value="ALL">Con o Sin Factura / Nota</option>
+              <option value="WITH_INVOICE">Solo con N° Factura / Nota</option>
+              <option value="WITHOUT_INVOICE">Sin Factura / Nota</option>
+            </select>
+          </div>
+
+          {/* 5. Ordenar Registros por */}
+          <div className="space-y-1">
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-indigo-300">
+              ↕️ Ordenar Tabla Por
+            </label>
+            <select
+              value={sortOrder}
+              onChange={(e) =>
+                setSortOrder(
+                  e.target.value as
+                    | 'DATE_DESC'
+                    | 'DATE_ASC'
+                    | 'COP_DESC'
+                    | 'COP_ASC'
+                    | 'UNITS_DESC'
+                    | 'CLIENT_ASC'
+                )
+              }
+              className="w-full rounded-xl border border-indigo-500/35 bg-slate-950/85 px-2.5 py-1.5 text-xs font-semibold text-white focus:border-indigo-400 focus:outline-none"
+            >
+              <option value="DATE_DESC">Fecha: Más reciente primero</option>
+              <option value="DATE_ASC">Fecha: Más antigua primero</option>
+              <option value="COP_DESC">Valor ($): De Mayor a Menor ↓</option>
+              <option value="COP_ASC">Valor ($): De Menor a Mayor ↑</option>
+              <option value="UNITS_DESC">Unidades: De Mayor a Menor ↓</option>
+              <option value="CLIENT_ASC">Cliente: Orden Alfabético A–Z</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Interactive Client Pills (Click para filtrar por Cliente al instante) */}
+        {availableClients.length > 0 && (
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+            <span className="text-[11px] font-semibold text-emerald-400 shrink-0 mr-1">
+              Clientes ({availableClients.length}):
+            </span>
+            <button
+              type="button"
+              onClick={() => setClientFilter('ALL')}
+              className={`shrink-0 rounded-lg px-2.5 py-1 text-xs font-medium transition-all ${
+                clientFilter === 'ALL'
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'bg-neutral-200/70 dark:bg-white/10 text-neutral-700 dark:text-slate-300 hover:bg-neutral-300 dark:hover:bg-white/20'
+              }`}
+            >
+              Todos
+            </button>
+            {availableClients.slice(0, 25).map((item) => (
+              <button
+                key={item.client}
+                type="button"
+                onClick={() =>
+                  setClientFilter((prev) =>
+                    prev === item.client ? 'ALL' : item.client
+                  )
+                }
+                className={`shrink-0 inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-all ${
+                  clientFilter === item.client
+                    ? 'border-emerald-400 bg-emerald-600 text-white shadow-sm font-bold'
+                    : 'border-neutral-300/80 dark:border-white/10 bg-white/60 dark:bg-slate-950/60 text-neutral-800 dark:text-slate-200 hover:border-emerald-400/50'
+                }`}
+              >
+                <span className="max-w-[160px] truncate">{item.client}</span>
+                <span className="rounded bg-black/25 px-1 font-mono text-[10px] opacity-85">
+                  {item.units}u
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Interactive Product Pills (Click para filtrar por Producto al instante) */}
+        {availableProducts.length > 0 && (
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+            <span className="text-[11px] font-semibold text-sky-400 shrink-0 mr-1">
+              Productos ({availableProducts.length}):
+            </span>
+            <button
+              type="button"
+              onClick={() => setProductFilter('ALL')}
+              className={`shrink-0 rounded-lg px-2.5 py-1 text-xs font-medium transition-all ${
+                productFilter === 'ALL'
+                  ? 'bg-sky-600 text-white shadow-sm'
+                  : 'bg-neutral-200/70 dark:bg-white/10 text-neutral-700 dark:text-slate-300 hover:bg-neutral-300 dark:hover:bg-white/20'
+              }`}
+            >
+              Todos
+            </button>
+            {availableProducts.slice(0, 25).map((item) => (
+              <button
+                key={item.product}
+                type="button"
+                onClick={() =>
+                  setProductFilter((prev) =>
+                    prev === item.product ? 'ALL' : item.product
+                  )
+                }
+                className={`shrink-0 inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-all ${
+                  productFilter === item.product
+                    ? 'border-sky-400 bg-sky-600 text-white shadow-sm font-bold'
+                    : 'border-neutral-300/80 dark:border-white/10 bg-white/60 dark:bg-slate-950/60 text-neutral-800 dark:text-slate-200 hover:border-sky-400/50'
+                }`}
+              >
+                <span className="max-w-[170px] truncate">{item.product}</span>
+                <span className="rounded bg-black/25 px-1 font-mono text-[10px] opacity-85">
+                  {item.units}u
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Interactive Date Pills (Chronological Day-by-Day) */}
         {availableDatesChronological.length > 0 && (
@@ -1428,7 +1721,11 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
               secondaryActionLabel="Limpiar todos los filtros"
               onSecondaryAction={() => {
                 setStatusFilter('ALL');
+                setClientFilter('ALL');
+                setProductFilter('ALL');
                 setLotFilter('ALL');
+                setExpiryFilter('ALL');
+                setInvoiceFilter('ALL');
                 setCauseFilter('ALL');
                 setSearchQuery('');
                 if (onClearExternalLotFilter) onClearExternalLotFilter();
@@ -1646,14 +1943,46 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
                           </span>
                         </td>
 
-                        <td className="px-2 py-3 font-medium text-neutral-900 dark:text-slate-100 max-w-[180px] truncate">
-                          {row.clientName}
+                        <td className="px-2 py-3 font-medium text-neutral-900 dark:text-slate-100 max-w-[190px] truncate">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setClientFilter((prev) =>
+                                prev === row.clientName.trim()
+                                  ? 'ALL'
+                                  : row.clientName.trim()
+                              )
+                            }
+                            title={`Filtrar todas las devoluciones del cliente: ${row.clientName}`}
+                            className={`text-left truncate max-w-full hover:underline ${
+                              clientFilter === row.clientName.trim()
+                                ? 'text-emerald-400 font-bold underline'
+                                : ''
+                            }`}
+                          >
+                            {row.clientName}
+                          </button>
                         </td>
 
                         <td className="px-2 py-3">
-                          <div className="font-medium text-neutral-900 dark:text-white">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setProductFilter((prev) =>
+                                prev === row.productName.trim()
+                                  ? 'ALL'
+                                  : row.productName.trim()
+                              )
+                            }
+                            title={`Filtrar todas las devoluciones del producto: ${row.productName}`}
+                            className={`text-left font-medium hover:underline ${
+                              productFilter === row.productName.trim()
+                                ? 'text-sky-400 font-bold underline'
+                                : 'text-neutral-900 dark:text-white'
+                            }`}
+                          >
                             {row.productName}
-                          </div>
+                          </button>
                           <div className="flex items-center gap-2 mt-0.5">
                             <span className="font-mono text-[10px] text-neutral-500 dark:text-slate-400">
                               Unit: {formatCOP(row.unitCost)}
