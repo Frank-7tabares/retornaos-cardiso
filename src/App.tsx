@@ -623,12 +623,12 @@ export function App() {
         richColors
       />
 
-      {/* Sticky Top Navbar (Balanced 2-row clean layout, crisp contrast in Light & Dark modes) */}
-      <header className="sticky top-0 z-40 border-b border-neutral-200/80 dark:border-white/[0.14] bg-white/95 dark:bg-slate-950/92 shadow-md">
-        <div className="mx-auto max-w-7xl px-4 py-2.5 sm:px-6 space-y-2">
-          {/* Top Row: Brand + Main Navigation Tabs */}
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3 shrink-0">
+      {/* Sticky Glassmorphic Top Navbar (VisionOS style) */}
+      <header className="sticky top-0 z-40 border-b border-white/30 dark:border-white/[0.14] bg-white/70 dark:bg-slate-950/60 backdrop-blur-2xl shadow-lg">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
+          {/* Brand & Navigation Pills */}
+          <div className="flex items-center gap-5">
+            <div className="flex items-center gap-3">
               <img
                 src="/cardiso_logo.png"
                 alt="Cardiso Logo"
@@ -636,32 +636,32 @@ export function App() {
               />
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold tracking-tight text-neutral-900 dark:text-white whitespace-nowrap">
-                    Retorna<span className="text-emerald-600 dark:text-emerald-400">OS</span>
+                  <span className="text-sm font-bold tracking-tight text-neutral-900 dark:text-white">
+                    Retorna<span className="text-emerald-400">OS</span>
                   </span>
-                  <Badge variant={mysqlConnected ? 'success' : 'indigo'} dot className="whitespace-nowrap">
+                  <Badge variant={mysqlConnected ? 'success' : 'indigo'} dot>
                     {mysqlConnected ? 'MySQL: retorna_db' : 'v2.5'}
                   </Badge>
                 </div>
-                <span className="block text-[10px] text-neutral-600 dark:text-slate-300 whitespace-nowrap">
+                <span className="block text-[10px] text-neutral-600 dark:text-slate-300">
                   Conectado a phpMyAdmin / HeidiSQL
                 </span>
               </div>
             </div>
 
-            <nav className="hidden md:flex items-center gap-1 rounded-2xl border border-neutral-300/90 dark:border-white/15 bg-neutral-100/90 dark:bg-slate-900/85 p-1">
+            <nav className="hidden md:flex items-center gap-1 rounded-2xl border border-neutral-300/80 dark:border-white/15 bg-white/60 dark:bg-slate-900/60 p-1 backdrop-blur-md">
               {/* 1. Dashboard: Solo Gerencia / Administrador y Calidad */}
               {(currentUser.role === 'ADMIN' || currentUser.role === 'CALIDAD') && (
                 <button
                   type="button"
                   onClick={() => setActiveTab('DASHBOARD')}
-                  className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all duration-150 whitespace-nowrap ${
+                  className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-1.5 text-xs font-medium transition-all duration-200 ${
                     activeTab === 'DASHBOARD'
                       ? 'bg-indigo-600 text-white shadow-sm'
-                      : 'text-neutral-700 dark:text-slate-300 hover:text-neutral-950 dark:hover:text-white'
+                      : 'text-neutral-700 dark:text-slate-300 hover:text-neutral-900 dark:hover:text-white'
                   }`}
                 >
-                  <LayoutGrid className="h-3.5 w-3.5 shrink-0" />
+                  <LayoutGrid className="h-3.5 w-3.5" />
                   1. Dashboard (% de Ventas)
                 </button>
               )}
@@ -670,13 +670,13 @@ export function App() {
               <button
                 type="button"
                 onClick={() => setActiveTab('WORKBENCH')}
-                className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all duration-150 whitespace-nowrap ${
+                className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-1.5 text-xs font-medium transition-all duration-200 ${
                   activeTab === 'WORKBENCH'
                     ? 'bg-indigo-600 text-white shadow-sm'
-                    : 'text-neutral-700 dark:text-slate-300 hover:text-neutral-950 dark:hover:text-white'
+                    : 'text-neutral-700 dark:text-slate-300 hover:text-neutral-900 dark:hover:text-white'
                 }`}
               >
-                <ClipboardCheck className="h-3.5 w-3.5 shrink-0" />
+                <ClipboardCheck className="h-3.5 w-3.5" />
                 {currentUser.role === 'VENDEDOR' || currentUser.role === 'PDV'
                   ? 'Mis Devoluciones'
                   : '2. Devoluciones por Zona'}
@@ -687,13 +687,13 @@ export function App() {
                 <button
                   type="button"
                   onClick={() => setActiveTab('ENGINEERING')}
-                  className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all duration-150 whitespace-nowrap ${
+                  className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-1.5 text-xs font-medium transition-all duration-200 ${
                     activeTab === 'ENGINEERING'
                       ? 'bg-emerald-600 text-white shadow-sm'
-                      : 'text-neutral-700 dark:text-slate-300 hover:text-neutral-950 dark:hover:text-white'
+                      : 'text-neutral-700 dark:text-slate-300 hover:text-neutral-900 dark:hover:text-white'
                   }`}
                 >
-                  <FlaskConical className="h-3.5 w-3.5 shrink-0" />
+                  <FlaskConical className="h-3.5 w-3.5" />
                   3. Ingenieras de Producción
                 </button>
               )}
@@ -703,173 +703,170 @@ export function App() {
                 <button
                   type="button"
                   onClick={() => setActiveTab('CATALOG')}
-                  className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all duration-150 whitespace-nowrap ${
+                  className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-1.5 text-xs font-medium transition-all duration-200 ${
                     activeTab === 'CATALOG'
                       ? 'bg-indigo-600 text-white shadow-sm'
-                      : 'text-neutral-700 dark:text-slate-300 hover:text-neutral-950 dark:hover:text-white'
+                      : 'text-neutral-700 dark:text-slate-300 hover:text-neutral-900 dark:hover:text-white'
                   }`}
                 >
-                  <PackageSearch className="h-3.5 w-3.5 shrink-0" />
+                  <PackageSearch className="h-3.5 w-3.5" />
                   4. Catálogo 2024
                 </button>
               )}
             </nav>
           </div>
 
-          {/* Bottom Row: Background Carousel + User Profile + Action Buttons (all single-line, balanced) */}
-          <div className="hidden md:flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-neutral-200/70 dark:border-white/10">
-            <div className="flex items-center gap-2">
-              {/* Interactive Carousel Controller for Nature, Farms & Landscapes */}
-              <div className="hidden xl:flex items-center gap-1.5 rounded-xl border border-neutral-300 dark:border-white/15 bg-neutral-100/80 dark:bg-slate-900/80 px-2.5 py-1.5">
-                <Trees className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                <button
-                  type="button"
-                  onClick={handlePrevSlide}
-                  title="Paisaje anterior"
-                  className="rounded p-0.5 text-neutral-600 dark:text-slate-300 hover:text-neutral-950 dark:hover:text-white"
-                >
-                  <ChevronLeft className="h-3.5 w-3.5" />
-                </button>
-                <span className="text-[11px] font-medium text-neutral-800 dark:text-slate-200 min-w-[155px] text-center truncate whitespace-nowrap">
-                  {currentSlide.label} ({slideIndex + 1}/{NATURE_FARM_CAROUSEL.length})
-                </span>
-                <button
-                  type="button"
-                  onClick={handleNextSlide}
-                  title="Siguiente paisaje"
-                  className="rounded p-0.5 text-neutral-600 dark:text-slate-300 hover:text-neutral-950 dark:hover:text-white"
-                >
-                  <ChevronRight className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const next = !isCarouselPlaying;
-                    setIsCarouselPlaying(next);
-                    toast.info(
-                      next
-                        ? 'Carrusel de paisajes en movimiento automático'
-                        : 'Carrusel de fondo pausado'
-                    );
-                  }}
-                  title={
-                    isCarouselPlaying
-                      ? 'Pausar carrusel de fondos'
-                      : 'Reproducir carrusel automático'
-                  }
-                  className={`rounded p-1 transition-colors ${
-                    isCarouselPlaying
-                      ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
-                      : 'text-neutral-500 dark:text-slate-400 hover:text-neutral-900 dark:hover:text-white'
-                  }`}
-                >
-                  {isCarouselPlaying ? (
-                    <Pause className="h-3 w-3" />
-                  ) : (
-                    <Play className="h-3 w-3" />
-                  )}
-                </button>
-              </div>
-
-              {/* Perfil del Usuario Activo */}
-              <div className="flex items-center gap-2 rounded-xl border border-neutral-300 dark:border-white/15 bg-neutral-100/80 dark:bg-slate-900/80 px-3 py-1">
-                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-emerald-600/15 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-mono text-[11px] font-bold border border-emerald-500/35">
-                  {currentUser.avatarInitials}
-                </div>
-                <div className="flex flex-col text-left">
-                  <span className="text-xs font-semibold text-neutral-900 dark:text-white truncate max-w-[190px] whitespace-nowrap">
-                    {currentUser.name}
-                  </span>
-                  <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-medium truncate max-w-[190px] whitespace-nowrap">
-                    {currentUser.roleLabel}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              {(currentUser.role === 'ADMIN' ||
-                currentUser.role === 'CALIDAD') && (
-                <button
-                  type="button"
-                  onClick={() => setIsReportModalOpen(true)}
-                  title="Generar Informe Ejecutivo Detallado con Logo de la Empresa (Sebastián)"
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-amber-500/50 bg-amber-100 dark:bg-amber-500/20 hover:bg-amber-200/80 dark:hover:bg-amber-500/30 px-3 py-1.5 text-xs font-bold text-amber-900 dark:text-amber-200 shadow-sm transition-all whitespace-nowrap"
-                >
-                  <Printer className="h-3.5 w-3.5 text-amber-700 dark:text-amber-300 shrink-0" />
-                  <span>Informe Ejecutivo</span>
-                </button>
-              )}
-
-              {(currentUser.role === 'ADMIN' ||
-                currentUser.role === 'RECEPCION' ||
-                currentUser.role === 'CALIDAD') && (
-                <button
-                  type="button"
-                  onClick={() => setIsExcelModalOpen(true)}
-                  title="Subir o actualizar el archivo Excel acumulado del día (.xlsx)"
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-500/50 bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 text-xs font-bold text-white shadow-sm shadow-emerald-600/20 transition-all whitespace-nowrap"
-                >
-                  <FileSpreadsheet className="h-3.5 w-3.5 shrink-0" />
-                  <span>Subir Excel (.xlsx)</span>
-                </button>
-              )}
-
+          {/* Right Actions: Nature/Farm Carousel Controller, Role Switcher, Help, Export, Theme, Logout */}
+          <div className="flex items-center gap-2">
+            {/* Interactive Carousel Controller for Nature, Farms & Landscapes */}
+            <div className="hidden xl:flex items-center gap-1.5 rounded-xl border border-neutral-300 dark:border-white/15 bg-white/75 dark:bg-slate-900/75 px-2.5 py-1 backdrop-blur-md">
+              <Trees className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
               <button
                 type="button"
-                onClick={() => setIsGuideOpen(true)}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-400/50 bg-indigo-100 dark:bg-indigo-500/20 hover:bg-indigo-200/80 dark:hover:bg-indigo-500/30 px-3 py-1.5 text-xs font-semibold text-indigo-800 dark:text-indigo-200 transition-all whitespace-nowrap"
+                onClick={handlePrevSlide}
+                title="Paisaje anterior"
+                className="rounded p-0.5 text-neutral-600 dark:text-slate-300 hover:text-white"
               >
-                <HelpCircle className="h-3.5 w-3.5 shrink-0" />
-                <span>Guía Fácil</span>
+                <ChevronLeft className="h-3.5 w-3.5" />
               </button>
-
+              <span className="text-[11px] font-medium text-neutral-800 dark:text-slate-200 min-w-[145px] text-center truncate">
+                {currentSlide.label} ({slideIndex + 1}/
+                {NATURE_FARM_CAROUSEL.length})
+              </span>
               <button
                 type="button"
-                onClick={handleExportCleanCSV}
-                title="Descargar consolidado limpio sin basura XML"
-                className="inline-flex items-center gap-1.5 rounded-xl border border-neutral-300 dark:border-white/15 bg-white dark:bg-slate-900/80 hover:bg-neutral-100 dark:hover:bg-slate-800 px-3 py-1.5 text-xs font-medium text-neutral-800 dark:text-slate-200 transition-all whitespace-nowrap"
+                onClick={handleNextSlide}
+                title="Siguiente paisaje"
+                className="rounded p-0.5 text-neutral-600 dark:text-slate-300 hover:text-white"
               >
-                <Download className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
-                <span>Exportar</span>
+                <ChevronRight className="h-3.5 w-3.5" />
               </button>
-
               <button
                 type="button"
-                onClick={handleRefreshSimulation}
-                title="Sincronizar con base de datos"
-                className="rounded-xl border border-neutral-300 dark:border-white/15 bg-white dark:bg-slate-900/80 p-2 text-neutral-700 dark:text-slate-300 hover:text-neutral-950 dark:hover:text-white transition-all"
+                onClick={() => {
+                  const next = !isCarouselPlaying;
+                  setIsCarouselPlaying(next);
+                  toast.info(
+                    next
+                      ? 'Carrusel de paisajes en movimiento automático'
+                      : 'Carrusel de fondo pausado'
+                  );
+                }}
+                title={
+                  isCarouselPlaying
+                    ? 'Pausar carrusel de fondos'
+                    : 'Reproducir carrusel automático'
+                }
+                className={`rounded p-1 transition-colors ${
+                  isCarouselPlaying
+                    ? 'bg-emerald-500/20 text-emerald-300'
+                    : 'text-slate-400 hover:text-white'
+                }`}
               >
-                <RefreshCw
-                  className={`h-3.5 w-3.5 ${
-                    isRefreshing ? 'animate-spin text-indigo-500 dark:text-indigo-400' : ''
-                  }`}
-                />
-              </button>
-
-              <button
-                type="button"
-                onClick={toggleTheme}
-                title="Alternar tema Oscuro / Claro"
-                className="rounded-xl border border-neutral-300 dark:border-white/15 bg-white dark:bg-slate-900/80 p-2 text-neutral-700 dark:text-slate-300 hover:text-neutral-950 dark:hover:text-white transition-all"
-              >
-                {darkMode ? (
-                  <Sun className="h-3.5 w-3.5 text-amber-400" />
+                {isCarouselPlaying ? (
+                  <Pause className="h-3 w-3" />
                 ) : (
-                  <Moon className="h-3.5 w-3.5 text-indigo-600" />
+                  <Play className="h-3 w-3" />
                 )}
               </button>
+            </div>
 
+            {/* Perfil del Usuario Activo (Inmutable, solo muestra quién es) */}
+            <div className="hidden lg:flex items-center gap-2 rounded-xl border border-neutral-300 dark:border-white/15 bg-white/70 dark:bg-slate-900/70 px-3 py-1.5 backdrop-blur-md">
+              <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-300 font-mono text-[11px] font-bold border border-emerald-400/30">
+                {currentUser.avatarInitials}
+              </div>
+              <div className="flex flex-col text-left">
+                <span className="text-xs font-semibold text-neutral-900 dark:text-white truncate max-w-[160px]">
+                  {currentUser.name}
+                </span>
+                <span className="text-[10px] text-emerald-400 font-medium truncate max-w-[160px]">
+                  {currentUser.roleLabel}
+                </span>
+              </div>
+            </div>
+
+            {(currentUser.role === 'ADMIN' ||
+              currentUser.role === 'CALIDAD') && (
               <button
                 type="button"
-                onClick={handleUserLogout}
-                title="Cerrar sesión actual"
-                className="inline-flex items-center gap-1.5 rounded-xl border border-neutral-300 dark:border-white/15 bg-white dark:bg-slate-900/80 hover:border-rose-500/50 hover:text-rose-600 dark:hover:text-rose-400 px-3 py-1.5 text-xs font-medium text-neutral-800 dark:text-slate-200 transition-all whitespace-nowrap"
+                onClick={() => setIsReportModalOpen(true)}
+                title="Generar Informe Ejecutivo Detallado con Logo de la Empresa (Sebastián)"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-amber-400/50 bg-amber-500/20 hover:bg-amber-500/30 px-3 py-1.5 text-xs font-bold text-amber-200 shadow-sm transition-all"
               >
-                <LogOut className="h-3.5 w-3.5 shrink-0" />
-                <span>Cerrar Sesión</span>
+                <Printer className="h-3.5 w-3.5 text-amber-300" />
+                <span className="hidden sm:inline">Informe Ejecutivo</span>
               </button>
-            </div>
+            )}
+
+            {(currentUser.role === 'ADMIN' ||
+              currentUser.role === 'RECEPCION' ||
+              currentUser.role === 'CALIDAD') && (
+              <button
+                type="button"
+                onClick={() => setIsExcelModalOpen(true)}
+                title="Subir o actualizar el archivo Excel acumulado del día (.xlsx)"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-400/50 bg-emerald-600/90 hover:bg-emerald-500 px-3 py-1.5 text-xs font-bold text-white shadow-sm shadow-emerald-600/20 transition-all"
+              >
+                <FileSpreadsheet className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Subir Excel (.xlsx)</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setIsGuideOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-400/40 bg-indigo-500/20 hover:bg-indigo-500/30 px-3 py-1.5 text-xs font-semibold text-indigo-700 dark:text-indigo-200 transition-all"
+            >
+              <HelpCircle className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Guía Fácil</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleExportCleanCSV}
+              title="Descargar consolidado limpio sin basura XML"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-neutral-300 dark:border-white/15 bg-white/70 dark:bg-slate-900/70 hover:bg-white dark:hover:bg-slate-800 px-3 py-1.5 text-xs font-medium text-neutral-700 dark:text-slate-200 transition-all"
+            >
+              <Download className="h-3.5 w-3.5 text-indigo-400" />
+              <span className="hidden sm:inline">Exportar</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleRefreshSimulation}
+              title="Simular carga con Skeleton Loaders"
+              className="rounded-xl border border-neutral-300 dark:border-white/15 bg-white/70 dark:bg-slate-900/70 p-2 text-neutral-600 dark:text-slate-300 hover:text-neutral-900 dark:hover:text-white transition-all"
+            >
+              <RefreshCw
+                className={`h-3.5 w-3.5 ${
+                  isRefreshing ? 'animate-spin text-indigo-400' : ''
+                }`}
+              />
+            </button>
+
+            <button
+              type="button"
+              onClick={toggleTheme}
+              title="Alternar tema Oscuro / Claro"
+              className="rounded-xl border border-neutral-300 dark:border-white/15 bg-white/70 dark:bg-slate-900/70 p-2 text-neutral-600 dark:text-slate-300 hover:text-neutral-900 dark:hover:text-white transition-all"
+            >
+              {darkMode ? (
+                <Sun className="h-3.5 w-3.5 text-amber-400" />
+              ) : (
+                <Moon className="h-3.5 w-3.5" />
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleUserLogout}
+              title="Cerrar sesión actual"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-neutral-300 dark:border-white/15 bg-white/70 dark:bg-slate-900/70 hover:border-rose-500/40 hover:text-rose-400 px-3 py-1.5 text-xs font-medium text-neutral-700 dark:text-slate-200 transition-all"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Cerrar Sesión</span>
+            </button>
           </div>
         </div>
 
