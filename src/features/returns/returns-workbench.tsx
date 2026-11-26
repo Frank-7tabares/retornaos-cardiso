@@ -1199,34 +1199,35 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
       </div>
 
       {/* Interactive Date Range, Lot & Cause Explorer Bar (Directly Below the 4 Panels) */}
-      <div className="rounded-2xl border border-white/60 dark:border-white/[0.14] bg-white/80 dark:bg-slate-900/65 backdrop-blur-2xl p-3.5 sm:p-4 shadow-xl space-y-3">
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+      <div className="rounded-2xl border border-white/60 dark:border-white/[0.14] bg-white/90 dark:bg-slate-900/90 p-3.5 sm:p-4 shadow-xl space-y-3">
+        {/* Row 1: Title + Date Range Pickers cleanly aligned */}
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
               <Calendar className="h-4 w-4" />
             </div>
             <div>
               <div className="text-xs font-semibold text-neutral-900 dark:text-white flex flex-wrap items-center gap-1.5">
                 <span>Filtro por Rango de Días (Col A), Lote (Col E) y Causa</span>
-                <Badge variant="success" dot>
+                <Badge variant="success" dot className="whitespace-nowrap">
                   Del {effectiveDateFrom} al {effectiveDateTo}
                 </Badge>
                 {lotFilter !== 'ALL' && (
-                  <Badge variant="indigo" dot>
+                  <Badge variant="indigo" dot className="whitespace-nowrap">
                     Lote L-{lotFilter}
                   </Badge>
                 )}
               </div>
               <p className="text-[11px] text-neutral-500 dark:text-slate-300">
-                Elige <strong>Desde qué día</strong> y <strong>Hasta qué día</strong> (ej. del 1 al 17 sin el 18), lote o causa. Los 4 paneles de arriba se actualizan al instante.
+                Elige <strong>Desde qué día</strong> y <strong>Hasta qué día</strong> (ej. del 1 al 17 sin el 18). Los 4 paneles superiores se actualizan al instante.
               </p>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
             {/* Selector Desde el día */}
-            <div className="flex items-center gap-1.5 rounded-xl border border-emerald-500/35 bg-slate-950/85 px-2.5 py-1.5">
-              <span className="text-[11px] font-bold text-emerald-300">
+            <div className="flex items-center gap-1.5 rounded-xl border border-emerald-500/35 bg-slate-950/90 px-2.5 py-1.5">
+              <span className="text-[11px] font-bold text-emerald-300 whitespace-nowrap">
                 Desde:
               </span>
               <select
@@ -1248,22 +1249,11 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
                   </option>
                 ))}
               </select>
-              <input
-                type="date"
-                value={dateFrom || minAvailableDate}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setDateFrom(val);
-                  if (dateTo && val > dateTo) setDateTo(val);
-                }}
-                className="w-5 bg-transparent text-xs text-emerald-300 focus:outline-none cursor-pointer"
-                title="Elegir fecha inicial en calendario"
-              />
             </div>
 
             {/* Selector Hasta el día */}
-            <div className="flex items-center gap-1.5 rounded-xl border border-amber-500/35 bg-slate-950/85 px-2.5 py-1.5">
-              <span className="text-[11px] font-bold text-amber-300">
+            <div className="flex items-center gap-1.5 rounded-xl border border-amber-500/35 bg-slate-950/90 px-2.5 py-1.5">
+              <span className="text-[11px] font-bold text-amber-300 whitespace-nowrap">
                 Hasta:
               </span>
               <select
@@ -1285,20 +1275,9 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
                   </option>
                 ))}
               </select>
-              <input
-                type="date"
-                value={dateTo || maxAvailableDate}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setDateTo(val);
-                  if (dateFrom && val < dateFrom) setDateFrom(val);
-                }}
-                className="w-5 bg-transparent text-xs text-amber-300 focus:outline-none cursor-pointer"
-                title="Elegir fecha final en calendario"
-              />
             </div>
 
-            {/* Botón Rápido: Sin el último día (ej. del 1 al 17 sin el 18) */}
+            {/* Botón Rápido: Sin el último día */}
             {availableDatesChronological.length >= 2 && (
               <button
                 type="button"
@@ -1309,7 +1288,7 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
                     `Mostrando devoluciones del ${minAvailableDate} al ${secondToLastDate} (excluyendo ${maxAvailableDate})`
                   );
                 }}
-                className={`rounded-xl border px-3 py-1.5 text-xs font-bold transition-all ${
+                className={`rounded-xl border px-3 py-1.5 text-xs font-bold transition-all whitespace-nowrap ${
                   dateFrom === minAvailableDate && dateTo === secondToLastDate
                     ? 'border-amber-400 bg-amber-500 text-slate-950 shadow-sm'
                     : 'border-amber-500/35 bg-amber-500/15 text-amber-300 hover:bg-amber-500/25'
@@ -1318,16 +1297,21 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
                 Sin el último día (Día {minAvailableDate.slice(8, 10)} al {secondToLastDate.slice(8, 10)})
               </button>
             )}
+          </div>
+        </div>
 
-            {/* Toggle Global Lot Search across all zones (Solo Admin, Calidad, Recepción) */}
-            {currentUser.role !== 'VENDEDOR' && currentUser.role !== 'PDV' && (
+        {/* Row 1.5: Global Scope + Cause + Lot + Reset aligned in a clean grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-2.5 pt-2.5 border-t border-neutral-200/70 dark:border-white/10 items-center">
+          {/* Toggle Global Lot Search across all zones (Solo Admin, Calidad, Recepción) */}
+          {currentUser.role !== 'VENDEDOR' && currentUser.role !== 'PDV' && (
+            <div className="lg:col-span-3">
               <button
                 type="button"
                 onClick={() => setSearchAllZonesForLot((prev) => !prev)}
-                className={`inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-medium transition-all ${
+                className={`w-full inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold transition-all whitespace-nowrap ${
                   searchAllZonesForLot
                     ? 'border-emerald-400/50 bg-emerald-500/20 text-emerald-700 dark:text-emerald-200'
-                    : 'border-neutral-300 dark:border-white/15 bg-white/70 dark:bg-slate-950/60 text-neutral-700 dark:text-slate-300'
+                    : 'border-neutral-300 dark:border-white/15 bg-white/70 dark:bg-slate-950/75 text-neutral-700 dark:text-slate-200 hover:bg-slate-800'
                 }`}
               >
                 <Globe className="h-3.5 w-3.5 shrink-0" />
@@ -1337,9 +1321,17 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
                     : 'Buscar en Todas las Zonas'}
                 </span>
               </button>
-            )}
+            </div>
+          )}
 
-            {/* Dropdown Filter by Cause */}
+          {/* Dropdown Filter by Cause */}
+          <div
+            className={
+              currentUser.role !== 'VENDEDOR' && currentUser.role !== 'PDV'
+                ? 'lg:col-span-5'
+                : 'lg:col-span-6'
+            }
+          >
             <select
               value={causeFilter}
               onChange={(e) =>
@@ -1352,7 +1344,7 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
                     | ReturnCauseKey
                 )
               }
-              className="w-full sm:w-auto rounded-xl border border-neutral-300 dark:border-white/15 bg-white/90 dark:bg-slate-950/80 px-3 py-1.5 text-xs font-medium text-neutral-900 dark:text-white focus:border-indigo-500 focus:outline-none"
+              className="w-full rounded-xl border border-neutral-300 dark:border-white/15 bg-white/90 dark:bg-slate-950/85 px-3 py-2 text-xs font-medium text-neutral-900 dark:text-white focus:border-indigo-500 focus:outline-none"
             >
               <option value="ALL">Todas las 7 Causas (Comercial + Calidad)</option>
               <option value="COMERCIAL_GROUP">
@@ -1370,8 +1362,16 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
                 </option>
               ))}
             </select>
+          </div>
 
-            {/* Dropdown Filter by Lot */}
+          {/* Dropdown Filter by Lot */}
+          <div
+            className={
+              currentUser.role !== 'VENDEDOR' && currentUser.role !== 'PDV'
+                ? 'lg:col-span-4 flex items-center gap-2'
+                : 'lg:col-span-6 flex items-center gap-2'
+            }
+          >
             <select
               value={lotFilter}
               onChange={(e) => {
@@ -1380,7 +1380,7 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
                   onClearExternalLotFilter();
                 }
               }}
-              className="w-full sm:w-auto rounded-xl border border-neutral-300 dark:border-white/15 bg-white/90 dark:bg-slate-950/80 px-3 py-1.5 font-mono text-xs font-semibold text-indigo-600 dark:text-indigo-300 focus:border-indigo-500 focus:outline-none"
+              className="w-full rounded-xl border border-neutral-300 dark:border-white/15 bg-white/90 dark:bg-slate-950/85 px-3 py-2 font-mono text-xs font-semibold text-indigo-600 dark:text-indigo-300 focus:border-indigo-500 focus:outline-none"
             >
               <option value="ALL">Todos los Lotes ({availableLots.length})</option>
               {availableLots.map((item) => (
@@ -1412,10 +1412,10 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
                   setSearchAllZonesForLot(false);
                   if (onClearExternalLotFilter) onClearExternalLotFilter();
                 }}
-                className="inline-flex items-center justify-center gap-1 rounded-xl border border-rose-500/30 bg-rose-500/15 px-3 py-1.5 text-xs font-medium text-rose-400 hover:bg-rose-500/25"
+                className="shrink-0 inline-flex items-center justify-center gap-1 rounded-xl border border-rose-500/30 bg-rose-500/15 px-3 py-2 text-xs font-semibold text-rose-400 hover:bg-rose-500/25 whitespace-nowrap"
               >
                 <X className="h-3.5 w-3.5" />
-                Limpiar Todos los Filtros
+                Limpiar
               </button>
             )}
           </div>

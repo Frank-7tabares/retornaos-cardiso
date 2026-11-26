@@ -731,44 +731,47 @@ export const ProductionEngineeringView: React.FC<
   return (
     <div className="space-y-6">
       {/* Top Executive Header */}
-      <div className="rounded-3xl border border-white/20 bg-slate-950/85 backdrop-blur-2xl p-4 sm:p-6 shadow-2xl">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="space-y-1.5">
+      <div className="rounded-3xl border border-white/20 bg-slate-950/90 p-4 sm:p-5 shadow-2xl">
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-2.5">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="quality" dot>
+              <Badge variant="quality" dot className="whitespace-nowrap">
                 Informe Ejecutivo · Ingeniería de Calidad & Planta
               </Badge>
-              <span className="rounded-full bg-violet-500/15 border border-violet-500/30 px-3 py-0.5 text-xs font-medium text-violet-300">
+              <span className="rounded-full bg-violet-500/15 border border-violet-500/30 px-3 py-0.5 text-xs font-medium text-violet-300 whitespace-nowrap">
                 Análisis Automático por Producto, Causa y Lote
               </span>
             </div>
+
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              {onOpenExcelModal && (
+                <button
+                  type="button"
+                  onClick={onOpenExcelModal}
+                  className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 px-3.5 py-2 text-xs font-bold text-white shadow-lg shadow-emerald-600/20 transition-all whitespace-nowrap"
+                >
+                  <FileSpreadsheet className="h-4 w-4 shrink-0" />
+                  Actualizar desde Excel (.xlsx)
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={handleExportQualityCSV}
+                className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-slate-900 hover:bg-slate-800 px-3.5 py-2 text-xs font-semibold text-white transition-all whitespace-nowrap"
+              >
+                <Download className="h-4 w-4 text-sky-400 shrink-0" />
+                Descargar Informe Calidad (Excel)
+              </button>
+            </div>
+          </div>
+
+          <div>
             <h1 className="text-lg sm:text-2xl font-bold tracking-tight text-white">
               Diagnóstico de Calidad por Producto, Lotes Críticos y Causales
             </h1>
-            <p className="text-xs sm:text-sm text-slate-300 max-w-3xl leading-relaxed">
-              Reporte consolidado generado directamente desde el Excel de devoluciones. Identifica al instante qué productos y qué <strong>Lotes</strong> presentan mayor incidencia por <strong>Lechosidad</strong>, <strong>Pérdida de Vacío</strong> o <strong>Rotación Comercial</strong>.
+            <p className="mt-0.5 text-xs sm:text-sm text-slate-300 leading-relaxed">
+              Reporte consolidado directo desde el Excel de devoluciones. Identifica qué productos y <strong>Lotes</strong> presentan mayor incidencia por <strong>Lechosidad</strong>, <strong>Pérdida de Vacío</strong> o <strong>Rotación Comercial</strong>.
             </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-            {onOpenExcelModal && (
-              <button
-                type="button"
-                onClick={onOpenExcelModal}
-                className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 hover:bg-emerald-500 px-4 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-600/20 transition-all"
-              >
-                <FileSpreadsheet className="h-4 w-4" />
-                Actualizar desde Excel (.xlsx)
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={handleExportQualityCSV}
-              className="inline-flex items-center gap-2 rounded-2xl border border-white/15 bg-slate-900 hover:bg-slate-800 px-4 py-2.5 text-xs font-semibold text-white transition-all"
-            >
-              <Download className="h-4 w-4 text-sky-400" />
-              Descargar Informe Calidad (Excel)
-            </button>
           </div>
         </div>
 
@@ -1342,24 +1345,26 @@ export const ProductionEngineeringView: React.FC<
           </div>
 
           {/* Gráfica 3 (4 Cols): Columnas Verticales por Lotes Críticos o Evolución por Fecha */}
-          <div className="lg:col-span-4 rounded-3xl border border-white/15 bg-slate-950/90 backdrop-blur-2xl p-5 shadow-xl flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between gap-2 mb-3">
-                <div>
+          <div className="lg:col-span-4 rounded-3xl border border-white/15 bg-slate-950/90 p-5 shadow-xl flex flex-col justify-between h-full">
+            <div className="flex flex-col flex-1 justify-between h-full gap-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
                   <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
-                    <Tag className="h-4 w-4 text-emerald-400" />
-                    3. Gráfica por {chartBarMode === 'LOTS' ? 'Lotes Críticos' : 'Fecha de Registro'}
+                    <Tag className="h-4 w-4 text-emerald-400 shrink-0" />
+                    <span className="truncate">
+                      3. Gráfica por {chartBarMode === 'LOTS' ? 'Lotes Críticos' : 'Fecha de Registro'}
+                    </span>
                   </h3>
                   <p className="text-[11px] text-slate-400">
                     Haz clic en cualquier columna para filtrar
                   </p>
                 </div>
 
-                <div className="inline-flex rounded-xl border border-white/15 bg-slate-900 p-0.5 text-[10px]">
+                <div className="inline-flex shrink-0 rounded-xl border border-white/15 bg-slate-900 p-0.5 text-[10px]">
                   <button
                     type="button"
                     onClick={() => setChartBarMode('LOTS')}
-                    className={`rounded-lg px-2 py-1 font-bold transition-all ${
+                    className={`rounded-lg px-2.5 py-1 font-bold transition-all whitespace-nowrap ${
                       chartBarMode === 'LOTS'
                         ? 'bg-emerald-600 text-white'
                         : 'text-slate-400 hover:text-white'
@@ -1370,7 +1375,7 @@ export const ProductionEngineeringView: React.FC<
                   <button
                     type="button"
                     onClick={() => setChartBarMode('DATES')}
-                    className={`rounded-lg px-2 py-1 font-bold transition-all ${
+                    className={`rounded-lg px-2.5 py-1 font-bold transition-all whitespace-nowrap ${
                       chartBarMode === 'DATES'
                         ? 'bg-indigo-600 text-white'
                         : 'text-slate-400 hover:text-white'
@@ -1381,8 +1386,8 @@ export const ProductionEngineeringView: React.FC<
                 </div>
               </div>
 
-              {/* Columnas Verticales Interactivas */}
-              <div className="mt-4 h-56 flex items-end justify-between gap-2 pt-6 pb-2 px-2 rounded-2xl border border-white/10 bg-slate-900/60">
+              {/* Columnas Verticales Interactivas (Centradas y ocupando el alto completo) */}
+              <div className="flex-1 min-h-[250px] flex items-end justify-center gap-2 pt-6 pb-3 px-3 rounded-2xl border border-white/10 bg-slate-900/60">
                 {chartBarMode === 'LOTS' ? (
                   engineeringChartsData.topLotsChart.length > 0 ? (
                     (() => {

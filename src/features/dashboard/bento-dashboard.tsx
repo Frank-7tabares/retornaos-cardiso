@@ -1132,86 +1132,91 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
 
       {/* Row 1: 4 Primary KPI Bento Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <BentoCard interactive className="group">
-          <div className="flex items-start justify-between">
-            <div>
-              <span className="text-xs font-medium text-neutral-600 dark:text-slate-300">
+        <BentoCard interactive className="group flex flex-col justify-between">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <span className="block text-xs font-medium text-neutral-600 dark:text-slate-300">
                 Costo Total Devoluciones
               </span>
-              <div className="mt-2 text-2xl font-bold tracking-tight text-neutral-900 dark:text-white font-mono">
+              <div className="mt-2.5 text-2xl font-bold tracking-tight text-neutral-900 dark:text-white font-mono">
                 {formatCOP(totals.totalCOP)}
               </div>
             </div>
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-indigo-500/30 bg-indigo-500/15 text-indigo-500 dark:text-indigo-300">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-indigo-500/30 bg-indigo-500/15 text-indigo-500 dark:text-indigo-300">
               <TrendingDown className="h-5 w-5" />
             </div>
           </div>
-          <div className="mt-4 flex items-center justify-between border-t border-neutral-200/60 dark:border-white/10 pt-3 text-xs">
-            <span className="text-neutral-600 dark:text-slate-300">
+          <div className="mt-4 flex items-center justify-between gap-2 border-t border-neutral-200/60 dark:border-white/10 pt-3 text-xs">
+            <span className="text-neutral-600 dark:text-slate-300 truncate">
               Sobre Ventas ({formatCompactCOP(totals.salesCOP)})
             </span>
             <Badge
               variant={totals.pctTotalOverSales > 6 ? 'warning' : 'indigo'}
               dot
+              className="shrink-0 whitespace-nowrap"
             >
               {formatPercent(totals.pctTotalOverSales)} del mes
             </Badge>
           </div>
         </BentoCard>
 
-        <BentoCard interactive>
-          <div className="flex items-start justify-between">
-            <div>
-              <div className="flex items-center gap-1.5">
+        <BentoCard interactive className="flex flex-col justify-between">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="text-xs font-medium text-neutral-600 dark:text-slate-300">
-                  Responsabilidad Comercial
+                  Resp. Comercial
                 </span>
                 <TooltipHint label="Suma: Por Cobrar + Próximo a Vencer + Vencido">
-                  <Badge variant="commercial">Comercial</Badge>
+                  <Badge variant="commercial" className="whitespace-nowrap">
+                    Comercial
+                  </Badge>
                 </TooltipHint>
               </div>
-              <div className="mt-2 text-2xl font-bold tracking-tight text-amber-600 dark:text-amber-300 font-mono">
+              <div className="mt-2.5 text-2xl font-bold tracking-tight text-amber-600 dark:text-amber-300 font-mono">
                 {formatCOP(totals.commercialCOP)}
               </div>
             </div>
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-amber-500/30 bg-amber-500/15 text-amber-500 dark:text-amber-300">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-amber-500/30 bg-amber-500/15 text-amber-500 dark:text-amber-300">
               <Briefcase className="h-5 w-5" />
             </div>
           </div>
-          <div className="mt-4 flex items-center justify-between border-t border-neutral-200/60 dark:border-white/10 pt-3 text-xs">
-            <span className="text-neutral-600 dark:text-slate-300">
+          <div className="mt-4 flex items-center justify-between gap-2 border-t border-neutral-200/60 dark:border-white/10 pt-3 text-xs">
+            <span className="text-neutral-600 dark:text-slate-300 truncate">
               {formatNumber(totals.commercialUnits)} unds (PR/V, Cobrar, Venc.)
             </span>
-            <span className="font-semibold text-amber-600 dark:text-amber-300">
+            <span className="shrink-0 whitespace-nowrap font-semibold text-amber-600 dark:text-amber-300">
               {formatPercent(totals.pctCommShare, 1)} del total
             </span>
           </div>
         </BentoCard>
 
-        <BentoCard interactive>
-          <div className="flex items-start justify-between">
-            <div>
-              <div className="flex items-center gap-1.5">
+        <BentoCard interactive className="flex flex-col justify-between">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="text-xs font-medium text-neutral-600 dark:text-slate-300">
-                  Responsabilidad Calidad
+                  Resp. Calidad
                 </span>
                 <TooltipHint label="Suma: Vacío + Por Fecha + Abombamiento + Lechoso">
-                  <Badge variant="quality">Planta / Calidad</Badge>
+                  <Badge variant="quality" className="whitespace-nowrap">
+                    Planta / Calidad
+                  </Badge>
                 </TooltipHint>
               </div>
-              <div className="mt-2 text-2xl font-bold tracking-tight text-sky-600 dark:text-sky-300 font-mono">
+              <div className="mt-2.5 text-2xl font-bold tracking-tight text-sky-600 dark:text-sky-300 font-mono">
                 {formatCOP(totals.qualityCOP)}
               </div>
             </div>
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-sky-500/30 bg-sky-500/15 text-sky-500 dark:text-sky-300">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-sky-500/30 bg-sky-500/15 text-sky-500 dark:text-sky-300">
               <FlaskConical className="h-5 w-5" />
             </div>
           </div>
-          <div className="mt-4 flex items-center justify-between border-t border-neutral-200/60 dark:border-white/10 pt-3 text-xs">
-            <span className="text-neutral-600 dark:text-slate-300">
+          <div className="mt-4 flex items-center justify-between gap-2 border-t border-neutral-200/60 dark:border-white/10 pt-3 text-xs">
+            <span className="text-neutral-600 dark:text-slate-300 truncate">
               {formatNumber(totals.qualityUnits)} unds (Lechoso, Vacío, Fecha)
             </span>
-            <span className="font-semibold text-sky-600 dark:text-sky-300">
+            <span className="shrink-0 whitespace-nowrap font-semibold text-sky-600 dark:text-sky-300">
               {formatPercent(totals.pctQualShare, 1)} del total
             </span>
           </div>
@@ -1220,33 +1225,34 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
         <BentoCard
           interactive
           onClick={() => onSelectZone('PDV-SABANETA')}
+          className="flex flex-col justify-between"
         >
-          <div className="flex items-start justify-between">
-            <div>
-              <span className="text-xs font-medium text-neutral-600 dark:text-slate-300">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <span className="block text-xs font-medium text-neutral-600 dark:text-slate-300">
                 Unidades & Auditoría Cuadre
               </span>
-              <div className="mt-2 text-2xl font-bold tracking-tight text-neutral-900 dark:text-white font-mono">
+              <div className="mt-2.5 text-2xl font-bold tracking-tight text-neutral-900 dark:text-white font-mono">
                 {formatNumber(totals.totalUnits)}{' '}
                 <span className="text-sm font-normal text-neutral-500 dark:text-slate-400">
                   unds
                 </span>
               </div>
             </div>
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-emerald-500/30 bg-emerald-500/15 text-emerald-500 dark:text-emerald-300">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-emerald-500/30 bg-emerald-500/15 text-emerald-500 dark:text-emerald-300">
               <ShieldAlert className="h-5 w-5" />
             </div>
           </div>
-          <div className="mt-4 flex items-center justify-between border-t border-neutral-200/60 dark:border-white/10 pt-3 text-xs">
-            <span className="text-neutral-600 dark:text-slate-300">
+          <div className="mt-4 flex items-center justify-between gap-2 border-t border-neutral-200/60 dark:border-white/10 pt-3 text-xs">
+            <span className="text-neutral-600 dark:text-slate-300 truncate">
               {formatNumber(totals.lineItems)} registros procesados
             </span>
             {unconciledCount > 0 ? (
-              <Badge variant="warning" dot>
+              <Badge variant="warning" dot className="shrink-0 whitespace-nowrap">
                 {unconciledCount} por REVISAR
               </Badge>
             ) : (
-              <Badge variant="success" dot>
+              <Badge variant="success" dot className="shrink-0 whitespace-nowrap">
                 100% Cuadrado
               </Badge>
             )}
@@ -1258,81 +1264,83 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
       {/* RESUMEN GERENCIAL Y ESCALAFÓN DE PRODUCTOS (DE MENOR A MAYOR ↑)       */}
       {/* ===================================================================== */}
       <BentoCard noPadding className="overflow-hidden">
-        <div className="border-b border-neutral-200/70 dark:border-white/10 bg-slate-950/50 p-5 space-y-4">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
-            <div>
+        <div className="border-b border-neutral-200/70 dark:border-white/10 bg-slate-950/50 p-4 sm:p-5 space-y-3.5">
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2">
               <div className="flex flex-wrap items-center gap-2">
-                <PackageCheck className="h-4 w-4 text-emerald-400" />
+                <PackageCheck className="h-4 w-4 text-emerald-400 shrink-0" />
                 <h2 className="text-base font-bold text-neutral-900 dark:text-white">
                   Escalafón de Productos Devueltos por Calidad y Comercial ({escalafonOrder === 'ASC' ? 'De Menor a Mayor ↑' : 'De Mayor a Menor ↓'})
                 </h2>
-                <Badge variant="success" dot>
+                <Badge variant="success" dot className="whitespace-nowrap">
                   Rango: {effectiveDateFrom} al {effectiveDateTo}
                 </Badge>
               </div>
-              <p className="mt-1 text-xs text-neutral-600 dark:text-slate-300">
-                Resumen ordenado de productos devueltos por <strong>Calidad (Lechosidad, Vacío)</strong> y <strong>Comercial (Próx. a Vencer, A Cobrar)</strong> para <strong>bajar inventarios en ruta</strong> y <strong>tomar correctivos en planta</strong>.
+              <p className="text-xs text-neutral-600 dark:text-slate-300">
+                Calidad (Lechosidad, Vacío) y Comercial (Próx. a Vencer, A Cobrar) para ajustar inventarios y planta.
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 shrink-0">
-              <div className="inline-flex rounded-xl border border-white/15 bg-slate-900 p-1">
-                <button
-                  type="button"
-                  onClick={() => setEscalafonOrder('ASC')}
-                  className={`inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
-                    escalafonOrder === 'ASC'
-                      ? 'bg-emerald-600 text-white shadow-sm'
-                      : 'text-slate-300 hover:text-white'
-                  }`}
-                >
-                  <ArrowUpDown className="h-3.5 w-3.5" />
-                  De Menor a Mayor (↑)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEscalafonOrder('DESC')}
-                  className={`inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
-                    escalafonOrder === 'DESC'
-                      ? 'bg-indigo-600 text-white shadow-sm'
-                      : 'text-slate-300 hover:text-white'
-                  }`}
-                >
-                  <ArrowUpDown className="h-3.5 w-3.5" />
-                  De Mayor a Menor (↓)
-                </button>
-              </div>
-
-              <div className="inline-flex rounded-xl border border-white/15 bg-slate-900 p-1">
-                {[
-                  { id: 'ALL', label: 'Todos' },
-                  { id: 'COMERCIAL', label: 'Comercial (Inventario)' },
-                  { id: 'CALIDAD', label: 'Calidad (Planta)' },
-                ].map((cat) => (
+            <div className="flex flex-wrap items-center justify-between gap-2.5 pt-1 border-t border-white/[0.06]">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="inline-flex rounded-xl border border-white/15 bg-slate-900 p-1">
                   <button
-                    key={cat.id}
                     type="button"
-                    onClick={() =>
-                      setEscalafonCategory(
-                        cat.id as 'ALL' | 'COMERCIAL' | 'CALIDAD'
-                      )
-                    }
-                    className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
-                      escalafonCategory === cat.id
-                        ? 'bg-amber-500 text-slate-950 font-bold'
+                    onClick={() => setEscalafonOrder('ASC')}
+                    className={`inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold transition-all whitespace-nowrap ${
+                      escalafonOrder === 'ASC'
+                        ? 'bg-emerald-600 text-white shadow-sm'
                         : 'text-slate-300 hover:text-white'
                     }`}
                   >
-                    {cat.label}
+                    <ArrowUpDown className="h-3.5 w-3.5" />
+                    De Menor a Mayor (↑)
                   </button>
-                ))}
+                  <button
+                    type="button"
+                    onClick={() => setEscalafonOrder('DESC')}
+                    className={`inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold transition-all whitespace-nowrap ${
+                      escalafonOrder === 'DESC'
+                        ? 'bg-indigo-600 text-white shadow-sm'
+                        : 'text-slate-300 hover:text-white'
+                    }`}
+                  >
+                    <ArrowUpDown className="h-3.5 w-3.5" />
+                    De Mayor a Menor (↓)
+                  </button>
+                </div>
+
+                <div className="inline-flex rounded-xl border border-white/15 bg-slate-900 p-1">
+                  {[
+                    { id: 'ALL', label: 'Todos' },
+                    { id: 'COMERCIAL', label: 'Comercial (Inventario)' },
+                    { id: 'CALIDAD', label: 'Calidad (Planta)' },
+                  ].map((cat) => (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() =>
+                        setEscalafonCategory(
+                          cat.id as 'ALL' | 'COMERCIAL' | 'CALIDAD'
+                        )
+                      }
+                      className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all whitespace-nowrap ${
+                        escalafonCategory === cat.id
+                          ? 'bg-amber-500 text-slate-950 font-bold'
+                          : 'text-slate-300 hover:text-white'
+                      }`}
+                    >
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {onOpenExecutiveReport && (
                 <button
                   type="button"
                   onClick={onOpenExecutiveReport}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 px-3.5 py-2 text-xs font-bold text-white shadow-md shadow-emerald-600/20 transition-all"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 px-3.5 py-2 text-xs font-bold text-white shadow-md shadow-emerald-600/20 transition-all whitespace-nowrap"
                 >
                   <Printer className="h-3.5 w-3.5" />
                   Abrir Informe Detallado con Logo
