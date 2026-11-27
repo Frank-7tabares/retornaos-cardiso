@@ -1213,11 +1213,11 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
         </div>
       )}
 
-      {/* Header & Zone Selector (100% Mobile Responsive) */}
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div>
+      {/* Header & Zone Selector (100% Mobile Responsive & Wrapped in Clean Dark Card) */}
+      <div className="rounded-2xl border border-white/15 bg-slate-900/90 p-4 sm:px-5 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between shadow-lg">
+        <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-lg sm:text-2xl font-bold tracking-tight text-neutral-900 dark:text-white">
+            <h1 className="text-lg sm:text-xl font-bold tracking-tight text-white">
               {currentUser.role === 'VENDEDOR' || currentUser.role === 'PDV'
                 ? `Mis Devoluciones — ${activeZone?.consolidatedName || currentUser.name}`
                 : `Devoluciones por Zona — ${activeZone?.consolidatedName || 'Todas las Zonas'}`}
@@ -1230,14 +1230,14 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
                 Todas las Zonas
               </Badge>
             )}
-            <Badge variant="success" dot>
+            <Badge variant="success" dot className="whitespace-nowrap">
               📅 Rango: {effectiveDateFrom} al {effectiveDateTo}
             </Badge>
           </div>
-          <p className="mt-0.5 text-xs sm:text-sm text-neutral-600 dark:text-slate-300">
+          <p className="mt-1 text-xs text-slate-300">
             {currentUser.role === 'VENDEDOR' || currentUser.role === 'PDV' ? (
               <>
-                Consulta tus devoluciones filtrando por <strong>rango de día a día</strong> (ej. del día 1 al 17 sin el 18). Los 4 paneles se actualizan automáticamente según el rango de fechas elegido.
+                Consulta tus devoluciones filtrando por <strong>rango de día a día</strong> (ej. del día 1 al 17 sin el 18). Los 4 paneles se actualizan automáticamente.
               </>
             ) : (
               <>
@@ -1247,13 +1247,13 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
           </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2">
+        <div className="flex flex-wrap xl:flex-nowrap items-center gap-2 shrink-0">
           {/* Selector de Zona / Punto de Venta */}
           <select
             value={activeZone?.id || ''}
             disabled={searchAllZonesForLot}
             onChange={(e) => handleSelectZone(e.target.value)}
-            className="w-full sm:w-auto rounded-xl border border-white/40 dark:border-white/15 bg-white/85 dark:bg-slate-900/85 backdrop-blur-xl px-3.5 py-2.5 text-xs font-medium text-neutral-900 dark:text-white shadow-sm focus:border-indigo-500 focus:outline-none disabled:opacity-50"
+            className="w-full sm:w-auto rounded-xl border border-white/15 bg-slate-950/90 px-3.5 py-2 text-xs font-semibold text-white shadow-sm focus:border-indigo-500 focus:outline-none disabled:opacity-50"
           >
             {accessibleZones.map((z) => (
               <option key={z.id} value={z.id} className="bg-slate-900 text-white">
@@ -1262,50 +1262,48 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
             ))}
           </select>
 
-          <div className="flex flex-wrap gap-2">
-            {/* Upload / Sync Daily Excel (.xlsx) CTA: Solo Admin, Recepción o Calidad */}
-            {onOpenExcelModal &&
-              (currentUser.role === 'ADMIN' ||
-                currentUser.role === 'RECEPCION' ||
-                currentUser.role === 'CALIDAD') && (
-                <button
-                  type="button"
-                  onClick={onOpenExcelModal}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-indigo-400/50 bg-indigo-600/90 hover:bg-indigo-500 px-3.5 py-2.5 text-xs font-bold text-white shadow-lg shadow-indigo-600/25 transition-all duration-200"
-                >
-                  <FileSpreadsheet className="h-4 w-4 shrink-0" />
-                  <span className="truncate">Subir / Actualizar Excel (.xlsx)</span>
-                </button>
-              )}
+          {/* Upload / Sync Daily Excel (.xlsx) CTA: Solo Admin, Recepción o Calidad */}
+          {onOpenExcelModal &&
+            (currentUser.role === 'ADMIN' ||
+              currentUser.role === 'RECEPCION' ||
+              currentUser.role === 'CALIDAD') && (
+              <button
+                type="button"
+                onClick={onOpenExcelModal}
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-indigo-400/50 bg-indigo-600 hover:bg-indigo-500 px-3.5 py-2 text-xs font-bold text-white shadow-md shadow-indigo-600/20 transition-all duration-200 whitespace-nowrap"
+              >
+                <FileSpreadsheet className="h-4 w-4 shrink-0" />
+                <span>Subir / Actualizar Excel (.xlsx)</span>
+              </button>
+            )}
 
-            {/* Toggle Hidden Columns Q..W */}
-            <button
-              type="button"
-              onClick={() => {
-                const next = !showHiddenMoneyCols;
-                setShowHiddenMoneyCols(next);
-                toast.info(
-                  next
-                    ? 'Valores en pesos ($ COP) visibles por causa'
-                    : 'Vista compacta en Unidades'
-                );
-              }}
-              className={`inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2.5 text-xs font-medium backdrop-blur-xl transition-all duration-200 ${
-                showHiddenMoneyCols
-                  ? 'border-indigo-400/50 bg-indigo-500/20 text-indigo-700 dark:text-indigo-200'
-                  : 'border-white/40 dark:border-white/15 bg-white/80 dark:bg-slate-900/75 text-neutral-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-800'
-              }`}
-            >
-              {showHiddenMoneyCols ? (
-                <EyeOff className="h-3.5 w-3.5 shrink-0" />
-              ) : (
-                <Eye className="h-3.5 w-3.5 shrink-0" />
-              )}
-              <span className="truncate">
-                {showHiddenMoneyCols ? 'Ocultar Valores ($)' : 'Ver Valores ($)'}
-              </span>
-            </button>
-          </div>
+          {/* Toggle Hidden Columns Q..W */}
+          <button
+            type="button"
+            onClick={() => {
+              const next = !showHiddenMoneyCols;
+              setShowHiddenMoneyCols(next);
+              toast.info(
+                next
+                  ? 'Valores en pesos ($ COP) visibles por causa'
+                  : 'Vista compacta en Unidades'
+              );
+            }}
+            className={`inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold transition-all duration-200 whitespace-nowrap ${
+              showHiddenMoneyCols
+                ? 'border-indigo-400/50 bg-indigo-500/20 text-indigo-200'
+                : 'border-white/15 bg-slate-950/85 text-slate-200 hover:bg-slate-800'
+            }`}
+          >
+            {showHiddenMoneyCols ? (
+              <EyeOff className="h-3.5 w-3.5 shrink-0" />
+            ) : (
+              <Eye className="h-3.5 w-3.5 shrink-0" />
+            )}
+            <span>
+              {showHiddenMoneyCols ? 'Ocultar Valores ($)' : 'Ver Valores ($)'}
+            </span>
+          </button>
         </div>
       </div>
 

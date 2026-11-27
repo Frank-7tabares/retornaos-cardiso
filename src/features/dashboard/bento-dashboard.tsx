@@ -1287,8 +1287,8 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
 
       {/* Row 1: 4 Primary KPI Bento Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <BentoCard interactive className="group flex flex-col justify-between">
-          <div className="flex items-start justify-between gap-4">
+        <BentoCard interactive className="group flex flex-col justify-between p-4 sm:p-5">
+          <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1 space-y-1.5">
               <span className="block text-xs font-semibold text-neutral-600 dark:text-slate-200">
                 Costo Total Devoluciones
@@ -1304,13 +1304,13 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
             </div>
           </div>
 
-          <div className="mt-3 text-2xl font-bold tracking-tight text-neutral-900 dark:text-white font-mono">
+          <div className="mt-3 text-xl xl:text-2xl font-bold tracking-tight text-neutral-900 dark:text-white font-mono">
             {formatCOP(totals.totalCOP)}
           </div>
 
-          <div className="mt-3.5 flex items-center justify-between gap-3 border-t border-neutral-200/60 dark:border-white/10 pt-3 text-xs">
+          <div className="mt-3.5 flex items-center justify-between gap-2 border-t border-neutral-200/60 dark:border-white/10 pt-3 text-[11px]">
             <span className="text-neutral-600 dark:text-slate-300 whitespace-nowrap">
-              Ventas: <strong>{formatCompactCOP(totals.salesCOP)}</strong>
+              Sobre Ventas: <strong>{formatCompactCOP(totals.salesCOP)}</strong>
             </span>
             <Badge
               variant={totals.pctTotalOverSales > 6 ? 'warning' : 'indigo'}
@@ -1322,8 +1322,8 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
           </div>
         </BentoCard>
 
-        <BentoCard interactive className="flex flex-col justify-between">
-          <div className="flex items-start justify-between gap-4">
+        <BentoCard interactive className="flex flex-col justify-between p-4 sm:p-5">
+          <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1 space-y-1.5">
               <span className="block text-xs font-semibold text-neutral-600 dark:text-slate-200">
                 Responsabilidad Comercial
@@ -1341,13 +1341,13 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
             </div>
           </div>
 
-          <div className="mt-3 text-2xl font-bold tracking-tight text-amber-600 dark:text-amber-300 font-mono">
+          <div className="mt-3 text-xl xl:text-2xl font-bold tracking-tight text-amber-600 dark:text-amber-300 font-mono">
             {formatCOP(totals.commercialCOP)}
           </div>
 
-          <div className="mt-3.5 flex items-center justify-between gap-3 border-t border-neutral-200/60 dark:border-white/10 pt-3 text-xs">
+          <div className="mt-3.5 flex items-center justify-between gap-2 border-t border-neutral-200/60 dark:border-white/10 pt-3 text-[11px]">
             <span className="text-neutral-600 dark:text-slate-300 whitespace-nowrap">
-              <strong>{formatNumber(totals.commercialUnits)} unds</strong> (Próx · Venc · Cobrar)
+              <strong>{formatNumber(totals.commercialUnits)} unds</strong> comerciales
             </span>
             <span className="shrink-0 whitespace-nowrap font-bold text-amber-600 dark:text-amber-300">
               {formatPercent(totals.pctCommShare, 1)} del total
@@ -1355,8 +1355,8 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
           </div>
         </BentoCard>
 
-        <BentoCard interactive className="flex flex-col justify-between">
-          <div className="flex items-start justify-between gap-4">
+        <BentoCard interactive className="flex flex-col justify-between p-4 sm:p-5">
+          <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1 space-y-1.5">
               <span className="block text-xs font-semibold text-neutral-600 dark:text-slate-200">
                 Responsabilidad Calidad
@@ -1374,13 +1374,13 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
             </div>
           </div>
 
-          <div className="mt-3 text-2xl font-bold tracking-tight text-sky-600 dark:text-sky-300 font-mono">
+          <div className="mt-3 text-xl xl:text-2xl font-bold tracking-tight text-sky-600 dark:text-sky-300 font-mono">
             {formatCOP(totals.qualityCOP)}
           </div>
 
-          <div className="mt-3.5 flex items-center justify-between gap-3 border-t border-neutral-200/60 dark:border-white/10 pt-3 text-xs">
+          <div className="mt-3.5 flex items-center justify-between gap-2 border-t border-neutral-200/60 dark:border-white/10 pt-3 text-[11px]">
             <span className="text-neutral-600 dark:text-slate-300 whitespace-nowrap">
-              <strong>{formatNumber(totals.qualityUnits)} unds</strong> (Vacío · Lech · Fecha)
+              <strong>{formatNumber(totals.qualityUnits)} unds</strong> calidad planta
             </span>
             <span className="shrink-0 whitespace-nowrap font-bold text-sky-600 dark:text-sky-300">
               {formatPercent(totals.pctQualShare, 1)} del total
@@ -1391,9 +1391,9 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
         <BentoCard
           interactive
           onClick={() => onSelectZone('PDV-SABANETA')}
-          className="flex flex-col justify-between"
+          className="flex flex-col justify-between p-4 sm:p-5"
         >
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1 space-y-1.5">
               <span className="block text-xs font-semibold text-neutral-600 dark:text-slate-200">
                 Unidades & Auditoría Cuadre
@@ -1409,14 +1409,14 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
             </div>
           </div>
 
-          <div className="mt-3 text-2xl font-bold tracking-tight text-neutral-900 dark:text-white font-mono">
+          <div className="mt-3 text-xl xl:text-2xl font-bold tracking-tight text-neutral-900 dark:text-white font-mono">
             {formatNumber(totals.totalUnits)}{' '}
             <span className="text-sm font-normal text-neutral-500 dark:text-slate-400">
               unds
             </span>
           </div>
 
-          <div className="mt-3.5 flex items-center justify-between gap-3 border-t border-neutral-200/60 dark:border-white/10 pt-3 text-xs">
+          <div className="mt-3.5 flex items-center justify-between gap-2 border-t border-neutral-200/60 dark:border-white/10 pt-3 text-[11px]">
             <span className="text-neutral-600 dark:text-slate-300 whitespace-nowrap">
               <strong>{formatNumber(totals.lineItems)}</strong> registros
             </span>
