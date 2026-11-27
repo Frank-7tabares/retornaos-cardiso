@@ -233,72 +233,72 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         <div className="fixed inset-0 bg-gradient-to-br from-slate-950/90 via-slate-900/80 to-emerald-950/80 backdrop-blur-[5px]" />
       </div>
 
-      {/* Main Glassmorphic Card Container - Compact & Single-Screen Viewport Fitted */}
-      <div className="relative z-10 w-full max-w-5xl my-auto rounded-2xl sm:rounded-3xl border border-white/20 bg-slate-900/85 backdrop-blur-2xl shadow-[0_20px_70px_rgba(0,0,0,0.7),0_0_50px_rgba(16,185,129,0.12),inset_0_1px_0_0_rgba(255,255,255,0.25)] overflow-hidden grid grid-cols-1 lg:grid-cols-12 max-h-[96vh]">
-        {/* Left Column: Brand & Capabilities & Compact User Directory */}
-        <div className="lg:col-span-6 flex flex-col justify-between border-b lg:border-b-0 lg:border-r border-white/15 p-4 sm:p-5 lg:p-6 bg-gradient-to-br from-slate-900/80 via-slate-900/50 to-emerald-950/45 overflow-hidden">
+      {/* Main Glassmorphic Card Container - Balanced & Readable Single-Screen Viewport */}
+      <div className="relative z-10 w-full max-w-6xl my-auto rounded-2xl sm:rounded-3xl border border-white/20 bg-slate-900/85 backdrop-blur-2xl shadow-[0_20px_70px_rgba(0,0,0,0.7),0_0_50px_rgba(16,185,129,0.12),inset_0_1px_0_0_rgba(255,255,255,0.25)] overflow-hidden grid grid-cols-1 lg:grid-cols-12 max-h-[95vh]">
+        {/* Left Column: Brand & Capabilities & User Directory */}
+        <div className="lg:col-span-6 flex flex-col justify-between border-b lg:border-b-0 lg:border-r border-white/15 p-5 sm:p-7 lg:p-8 bg-gradient-to-br from-slate-900/80 via-slate-900/50 to-emerald-950/45 overflow-hidden">
           <div>
             {/* Top Pill / Brand Logo & Badge */}
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-3">
               <img
                 src="/cardiso_logo.png"
                 alt="Cardiso Logo"
-                className="h-7 w-auto object-contain drop-shadow"
+                className="h-9 w-auto object-contain drop-shadow"
               />
-              <div className="inline-flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-950/50 backdrop-blur-md px-2.5 py-1 shadow-sm shadow-emerald-900/20">
-                <span className="text-[11px] font-bold tracking-tight text-white">
+              <div className="inline-flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-950/50 backdrop-blur-md px-3 py-1.5 shadow-sm shadow-emerald-900/20">
+                <span className="text-xs sm:text-sm font-bold tracking-tight text-white">
                   Retorna<span className="text-emerald-400">OS</span>
                 </span>
-                <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="text-[9px] font-semibold tracking-wide text-emerald-300">
+                <span className="inline-block h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="text-[11px] font-semibold tracking-wide text-emerald-300">
                   Enterprise v2.5
                 </span>
               </div>
             </div>
 
             {/* Headline */}
-            <h1 className="mt-2 text-lg sm:text-xl font-bold tracking-tight text-white leading-tight">
+            <h1 className="mt-3 text-xl sm:text-2xl lg:text-[26px] font-bold tracking-tight text-white leading-snug">
               Control de Devoluciones &amp;{' '}
               <span className="bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 bg-clip-text text-transparent">
                 Trazabilidad en Tiempo Real
               </span>
             </h1>
-            <p className="mt-1 text-[11px] text-slate-300 leading-normal line-clamp-2">
+            <p className="mt-1.5 text-xs sm:text-sm text-slate-300 leading-relaxed">
               Validación de lotes, registro fotográfico de causales y liquidación comercial automática vs. calidad.
             </p>
 
-            {/* 3 Compact Feature Pills in a Sleek Row/Grid */}
-            <div className="mt-2.5 grid grid-cols-1 sm:grid-cols-3 gap-1.5 text-[10px]">
-              <div className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] p-1.5">
-                <CheckCircle2 className="h-3 w-3 text-emerald-400 shrink-0" />
-                <span className="truncate text-slate-200">Filtro por Lote &amp; Fotos</span>
+            {/* 3 Feature Pills in a Sleek Row/Grid */}
+            <div className="mt-3.5 grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+              <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-2.5 py-2">
+                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                <span className="truncate font-medium text-slate-200">Filtro por Lote &amp; Fotos</span>
               </div>
-              <div className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] p-1.5">
-                <Zap className="h-3 w-3 text-teal-300 shrink-0" />
-                <span className="truncate text-slate-200">Cálculo Automático Q–W</span>
+              <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-2.5 py-2">
+                <Zap className="h-3.5 w-3.5 text-teal-300 shrink-0" />
+                <span className="truncate font-medium text-slate-200">Cálculo Automático Q–W</span>
               </div>
-              <div className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] p-1.5">
-                <ShieldCheck className="h-3 w-3 text-cyan-300 shrink-0" />
-                <span className="truncate text-slate-200">Seguridad Roles (RBAC)</span>
+              <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-2.5 py-2">
+                <ShieldCheck className="h-3.5 w-3.5 text-cyan-300 shrink-0" />
+                <span className="truncate font-medium text-slate-200">Seguridad Roles (RBAC)</span>
               </div>
             </div>
           </div>
 
-          {/* Quick Role Switcher (Compact Scrollable Directory) */}
-          <div className="mt-3 pt-2.5 border-t border-white/15">
-            <div className="flex items-center justify-between gap-1.5 mb-1.5">
-              <div className="flex items-center gap-1 text-[11px] font-semibold text-emerald-300">
-                <Users className="h-3 w-3 text-emerald-400" />
+          {/* Quick Role Switcher (Scrollable Directory) */}
+          <div className="mt-4 pt-3.5 border-t border-white/15">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <div className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-emerald-300">
+                <Users className="h-4 w-4 text-emerald-400" />
                 <span>Directorio ({filteredUsers.length} usuarios):</span>
               </div>
-              <span className="text-[9px] text-slate-400">
+              <span className="text-xs text-slate-400">
                 Selecciona tu usuario
               </span>
             </div>
 
             {/* Filter Pills & Search */}
-            <div className="space-y-1.5 mb-2">
-              <div className="flex items-center gap-1 overflow-x-auto pb-0.5 text-[10px]">
+            <div className="space-y-2 mb-2.5">
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 text-xs">
                 {[
                   { key: 'ALL', label: 'Todos' },
                   { key: 'VENDEDORES', label: 'Vendedores' },
@@ -309,7 +309,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                     key={cat.key}
                     type="button"
                     onClick={() => setUserCategoryFilter(cat.key as any)}
-                    className={`rounded-md px-2 py-0.5 font-medium transition-colors whitespace-nowrap ${
+                    className={`rounded-lg px-2.5 py-1 font-medium transition-colors whitespace-nowrap ${
                       userCategoryFilter === cat.key
                         ? 'bg-emerald-500/25 text-emerald-300 border border-emerald-500/40'
                         : 'bg-white/[0.04] text-slate-300 hover:text-white border border-transparent'
@@ -321,19 +321,19 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               </div>
 
               <div className="relative">
-                <Search className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400" />
+                <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
                 <input
                   type="text"
                   value={userSearchQuery}
                   onChange={(e) => setUserSearchQuery(e.target.value)}
                   placeholder="Buscar nombre o zona (ej. Santiago, Z02, Belén)..."
-                  className="w-full rounded-lg border border-white/15 bg-slate-950/70 pl-7 pr-2 py-1 text-[11px] text-white placeholder:text-slate-500 focus:border-emerald-400 focus:outline-none"
+                  className="w-full rounded-xl border border-white/15 bg-slate-950/70 pl-8 pr-3 py-2 text-xs sm:text-sm text-white placeholder:text-slate-500 focus:border-emerald-400 focus:outline-none"
                 />
               </div>
             </div>
 
             {/* Grid of Users with Max Height and Custom Scroll */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 max-h-32 sm:max-h-36 overflow-y-auto pr-1">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-48 sm:max-h-52 overflow-y-auto pr-1">
               {filteredUsers.map((u) => {
                 const isCurrent = email.toLowerCase() === u.email.toLowerCase();
                 return (
@@ -341,24 +341,24 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                     key={u.id}
                     type="button"
                     onClick={() => handleSelectUserFromDirectory(u)}
-                    className={`group flex flex-col justify-center rounded-lg border p-1.5 text-left transition-all duration-150 ${
+                    className={`group flex flex-col justify-center rounded-xl border p-2.5 text-left transition-all duration-150 ${
                       isCurrent
                         ? 'bg-emerald-500/25 border-emerald-400 shadow-sm ring-1 ring-emerald-400/40'
                         : 'border-white/10 bg-white/[0.06] hover:bg-emerald-500/15 hover:border-emerald-400/50'
                     }`}
                     title={`${u.name} · ${u.roleLabel}`}
                   >
-                    <div className="flex items-center justify-between gap-1">
-                      <span className={`truncate text-[10px] font-semibold ${isCurrent ? 'text-emerald-200' : 'text-white'}`}>
+                    <div className="flex items-center justify-between gap-1.5">
+                      <span className={`truncate text-xs font-bold ${isCurrent ? 'text-emerald-200' : 'text-white'}`}>
                         {u.name}
                       </span>
                       {u.assignedZoneId && (
-                        <span className="shrink-0 font-mono text-[8px] font-bold px-1 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                        <span className="shrink-0 font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                           {u.assignedZoneId}
                         </span>
                       )}
                     </div>
-                    <span className="truncate text-[9px] text-slate-300/80">
+                    <span className="truncate text-[11px] text-slate-300/85 mt-0.5">
                       {u.roleLabel}
                     </span>
                   </button>
@@ -368,44 +368,44 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           </div>
         </div>
 
-        {/* Right Column: High-Impact Login & Register Form (Compact Height) */}
-        <div className="lg:col-span-6 p-4 sm:p-5 lg:p-6 flex flex-col justify-center bg-slate-950/40 overflow-y-auto">
-          <div className="mx-auto w-full max-w-sm sm:max-w-md">
+        {/* Right Column: High-Impact Login & Register Form */}
+        <div className="lg:col-span-6 p-5 sm:p-7 lg:p-9 flex flex-col justify-center bg-slate-950/40 overflow-y-auto">
+          <div className="mx-auto w-full max-w-md">
             {/* High-Contrast Segmented Switcher */}
-            <div className="relative grid grid-cols-2 rounded-xl border border-white/20 bg-slate-950/80 p-0.5 mb-3 shadow-inner">
+            <div className="relative grid grid-cols-2 rounded-xl border border-white/20 bg-slate-950/80 p-1 mb-4 shadow-inner">
               <button
                 type="button"
                 onClick={() => setMode('login')}
-                className={`relative z-10 flex items-center justify-center gap-1.5 rounded-lg py-1 text-xs font-semibold transition-all duration-200 ${
+                className={`relative z-10 flex items-center justify-center gap-2 rounded-lg py-2 text-xs sm:text-sm font-semibold transition-all duration-200 ${
                   mode === 'login'
                     ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-900/40'
                     : 'text-slate-300 hover:text-white'
                 }`}
               >
-                <KeyRound className="h-3 w-3" />
+                <KeyRound className="h-3.5 w-3.5" />
                 Iniciar Sesión
               </button>
               <button
                 type="button"
                 onClick={() => setMode('register')}
-                className={`relative z-10 flex items-center justify-center gap-1.5 rounded-lg py-1 text-xs font-semibold transition-all duration-200 ${
+                className={`relative z-10 flex items-center justify-center gap-2 rounded-lg py-2 text-xs sm:text-sm font-semibold transition-all duration-200 ${
                   mode === 'register'
                     ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-900/40'
                     : 'text-slate-300 hover:text-white'
                 }`}
               >
-                <UserCheck className="h-3 w-3" />
+                <UserCheck className="h-3.5 w-3.5" />
                 Registro
               </button>
             </div>
 
             {/* Title Section */}
-            <div className="mb-2.5">
-              <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-1.5">
+            <div className="mb-4">
+              <h2 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
                 {mode === 'login' ? (
                   <>
                     <span>Bienvenido de nuevo</span>
-                    <span className="inline-block h-2 w-2 rounded-full bg-emerald-400" />
+                    <span className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-400" />
                   </>
                 ) : (
                   <>
@@ -414,7 +414,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                   </>
                 )}
               </h2>
-              <p className="text-[11px] text-slate-300">
+              <p className="mt-0.5 text-xs sm:text-sm text-slate-300">
                 {mode === 'login'
                   ? 'Ingresa tus credenciales personales para acceder.'
                   : 'Registra un vendedor o punto en el directorio corporativo.'}
@@ -429,23 +429,23 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 exit={{ opacity: 0, y: -4 }}
                 transition={{ duration: 0.15 }}
                 onSubmit={handleSubmit}
-                className="space-y-2.5"
+                className="space-y-3.5"
               >
                 {/* Mode: Register -> Nombre Completo */}
                 {mode === 'register' && (
                   <div>
-                    <label className="block text-[11px] font-semibold text-slate-200 mb-0.5">
+                    <label className="block text-xs sm:text-sm font-semibold text-slate-200 mb-1">
                       Nombre Completo
                     </label>
                     <div className="relative">
-                      <User className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-emerald-400" />
+                      <User className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-400" />
                       <input
                         type="text"
                         required
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         placeholder="Ej. Carlos Andrés Restrepo"
-                        className="w-full rounded-xl border border-white/20 bg-slate-950/80 pl-8 pr-3 py-1.5 text-xs text-white placeholder:text-slate-500 focus:border-emerald-400 focus:bg-slate-950 focus:outline-none focus:ring-1 focus:ring-emerald-400/25 transition-all shadow-sm"
+                        className="w-full rounded-xl border border-white/20 bg-slate-950/80 pl-10 pr-3.5 py-2.5 text-xs sm:text-sm text-white placeholder:text-slate-500 focus:border-emerald-400 focus:bg-slate-950 focus:outline-none focus:ring-1 focus:ring-emerald-400/25 transition-all shadow-sm"
                       />
                     </div>
                   </div>
@@ -453,33 +453,33 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
 
                 {/* Correo Corporativo (Both modes) */}
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-200 mb-0.5">
+                  <label className="block text-xs sm:text-sm font-semibold text-slate-200 mb-1">
                     Correo Corporativo
                   </label>
                   <div className="relative">
-                    <Mail className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-emerald-400" />
+                    <Mail className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-400" />
                     <input
                       type="email"
                       required
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="usuario@alimentoscarla.co"
-                      className="w-full rounded-xl border border-white/20 bg-slate-950/80 pl-8 pr-3 py-1.5 text-xs text-white placeholder:text-slate-500 focus:border-emerald-400 focus:bg-slate-950 focus:outline-none focus:ring-1 focus:ring-emerald-400/25 transition-all shadow-sm"
+                      className="w-full rounded-xl border border-white/20 bg-slate-950/80 pl-10 pr-3.5 py-2.5 text-xs sm:text-sm text-white placeholder:text-slate-500 focus:border-emerald-400 focus:bg-slate-950 focus:outline-none focus:ring-1 focus:ring-emerald-400/25 transition-all shadow-sm"
                     />
                   </div>
                 </div>
 
                 {/* Mode: Register -> Rol Operativo & Zona Asignada (Side-by-Side Grid) */}
                 {mode === 'register' && (
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 gap-2.5">
                     <div>
-                      <label className="block text-[11px] font-semibold text-slate-200 mb-0.5">
+                      <label className="block text-xs sm:text-sm font-semibold text-slate-200 mb-1">
                         Rol Operativo
                       </label>
                       <select
                         value={selectedRole}
                         onChange={(e) => setSelectedRole(e.target.value as UserRole)}
-                        className="w-full rounded-xl border border-white/20 bg-slate-950/90 px-2 py-1.5 text-xs text-white focus:border-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-400/25 shadow-sm"
+                        className="w-full rounded-xl border border-white/20 bg-slate-950/90 px-3 py-2.5 text-xs sm:text-sm text-white focus:border-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-400/25 shadow-sm"
                       >
                         <option value="VENDEDOR">Vendedor Ruta</option>
                         <option value="PDV">Punto de Venta</option>
@@ -488,15 +488,15 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                       </select>
                     </div>
                     <div>
-                      <label className="block text-[11px] font-semibold text-slate-200 mb-0.5">
+                      <label className="block text-xs sm:text-sm font-semibold text-slate-200 mb-1">
                         Zona / Sede
                       </label>
                       <div className="relative">
-                        <Building2 className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-emerald-400" />
+                        <Building2 className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-emerald-400" />
                         <select
                           value={zoneCode}
                           onChange={(e) => setZoneCode(e.target.value)}
-                          className="w-full rounded-xl border border-white/20 bg-slate-950/90 pl-6 pr-2 py-1.5 text-xs text-white focus:border-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-400/25 shadow-sm"
+                          className="w-full rounded-xl border border-white/20 bg-slate-950/90 pl-8 pr-2.5 py-2.5 text-xs sm:text-sm text-white focus:border-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-400/25 shadow-sm"
                         >
                           {REAL_ZONES_SUMMARY.map((z) => (
                             <option key={z.id} value={z.id}>
@@ -511,8 +511,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
 
                 {/* Contraseña */}
                 <div>
-                  <div className="flex items-center justify-between mb-0.5">
-                    <label className="block text-[11px] font-semibold text-slate-200">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs sm:text-sm font-semibold text-slate-200">
                       Contraseña Personal
                     </label>
                     {mode === 'login' && (
@@ -524,14 +524,14 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                               'Se enviará un enlace de seguridad de 10 minutos a tu correo corporativo.',
                           })
                         }
-                        className="text-[10px] font-medium text-emerald-400 hover:text-emerald-300 transition-colors"
+                        className="text-xs font-medium text-emerald-400 hover:text-emerald-300 transition-colors"
                       >
                         ¿Olvidaste tu clave?
                       </button>
                     )}
                   </div>
                   <div className="relative">
-                    <Lock className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-emerald-400" />
+                    <Lock className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-400" />
                     <input
                       type={showPassword ? 'text' : 'password'}
                       required
@@ -541,7 +541,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                         setAuthError(null);
                       }}
                       placeholder="Escribe tu contraseña..."
-                      className={`w-full rounded-xl border bg-slate-950/80 pl-8 pr-8 py-1.5 text-xs text-white focus:bg-slate-950 focus:outline-none transition-all shadow-sm ${
+                      className={`w-full rounded-xl border bg-slate-950/80 pl-10 pr-10 py-2.5 text-xs sm:text-sm text-white focus:bg-slate-950 focus:outline-none transition-all shadow-sm ${
                         authError
                           ? 'border-rose-500 focus:border-rose-400 focus:ring-1 focus:ring-rose-500/25'
                           : 'border-white/20 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400/25'
@@ -550,12 +550,12 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
                     >
                       {showPassword ? (
-                        <EyeOff className="h-3.5 w-3.5" />
+                        <EyeOff className="h-4 w-4" />
                       ) : (
-                        <Eye className="h-3.5 w-3.5" />
+                        <Eye className="h-4 w-4" />
                       )}
                     </button>
                   </div>
@@ -563,16 +563,16 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                     <motion.div
                       initial={{ opacity: 0, y: -2 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="mt-1 flex items-center gap-1 text-[10px] text-rose-400 font-medium"
+                      className="mt-1.5 flex items-center gap-1.5 text-xs text-rose-400 font-medium"
                     >
                       <span>⚠️ {authError}</span>
                     </motion.div>
                   )}
                 </div>
 
-                {/* Ultra-Compact Security Footnote */}
-                <div className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.03] px-2 py-1 text-[10px] text-slate-400">
-                  <ShieldCheck className="h-3 w-3 shrink-0 text-emerald-400" />
+                {/* Security Footnote */}
+                <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-slate-400">
+                  <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
                   <span className="truncate">
                     JWT HttpOnly · Encriptación Argon2id · Sesión Protegida
                   </span>
@@ -582,9 +582,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-500 hover:from-emerald-400 hover:to-teal-400 active:scale-[0.99] disabled:opacity-60 px-4 py-2 text-xs sm:text-sm font-bold text-white shadow-lg shadow-emerald-600/30 border border-emerald-400/30 transition-all duration-200 mt-1"
+                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-500 hover:from-emerald-400 hover:to-teal-400 active:scale-[0.99] disabled:opacity-60 px-5 py-3 text-sm sm:text-base font-bold text-white shadow-lg shadow-emerald-600/30 border border-emerald-400/30 transition-all duration-200 mt-1"
                 >
-                  <KeyRound className="h-3.5 w-3.5" />
+                  <KeyRound className="h-4 w-4" />
                   {isSubmitting
                     ? 'Verificando...'
                     : mode === 'login'
