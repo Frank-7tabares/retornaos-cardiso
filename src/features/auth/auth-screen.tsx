@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ShieldCheck,
@@ -47,6 +47,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   const [authError, setAuthError] = useState<string | null>(null);
   const [userCategoryFilter, setUserCategoryFilter] = useState<'ALL' | 'VENDEDORES' | 'PDV' | 'CONTROL'>('ALL');
   const [userSearchQuery, setUserSearchQuery] = useState('');
+  const passwordInputRef = useRef<HTMLInputElement | null>(null);
 
   const currentSlide = slides[activeSlideIndex] || {
     id: 'default-farm',
@@ -212,10 +213,19 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     toast.info(`Usuario seleccionado: ${user.name}`, {
       description: `Ingresa tu contraseña para acceder a la zona ${user.assignedZoneId || user.roleLabel}.`,
     });
+    setTimeout(() => {
+      if (passwordInputRef.current) {
+        passwordInputRef.current.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+        });
+        passwordInputRef.current.focus();
+      }
+    }, 80);
   };
 
   return (
-    <div className="relative min-h-screen w-full lg:h-screen lg:overflow-hidden text-white flex items-center justify-center p-2 sm:p-4 lg:p-4">
+    <div className="relative min-h-screen w-full overflow-y-auto lg:h-screen lg:overflow-hidden text-white flex items-start lg:items-center justify-center py-4 px-2.5 sm:p-4">
       {/* Dynamic Nature & Farm Wallpaper */}
       <div className="fixed inset-0 -z-10 overflow-hidden bg-slate-950">
         <AnimatePresence mode="popLayout">
@@ -233,10 +243,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         <div className="fixed inset-0 bg-gradient-to-br from-slate-950/90 via-slate-900/80 to-emerald-950/80 backdrop-blur-[5px]" />
       </div>
 
-      {/* Main Glassmorphic Card Container - Balanced Medium Size & Clean Proportions */}
-      <div className="relative z-10 w-full max-w-[1120px] my-auto rounded-2xl sm:rounded-3xl border border-white/20 bg-slate-900/85 backdrop-blur-2xl shadow-[0_20px_70px_rgba(0,0,0,0.7),0_0_50px_rgba(16,185,129,0.12),inset_0_1px_0_0_rgba(255,255,255,0.25)] overflow-hidden grid grid-cols-1 lg:grid-cols-12 max-h-[95vh]">
+      {/* Main Glassmorphic Card Container - Mobile Scrollable + Desktop Single-Screen */}
+      <div className="relative z-10 w-full max-w-[1120px] my-auto rounded-2xl sm:rounded-3xl border border-white/20 bg-slate-900/85 backdrop-blur-2xl shadow-[0_20px_70px_rgba(0,0,0,0.7),0_0_50px_rgba(16,185,129,0.12),inset_0_1px_0_0_rgba(255,255,255,0.25)] overflow-hidden grid grid-cols-1 lg:grid-cols-12 lg:max-h-[95vh]">
         {/* Left Column: Brand & Capabilities & User Directory */}
-        <div className="lg:col-span-6 flex flex-col justify-between border-b lg:border-b-0 lg:border-r border-white/15 p-5 sm:p-6 lg:p-7 bg-gradient-to-br from-slate-900/80 via-slate-900/50 to-emerald-950/45 overflow-hidden">
+        <div className="lg:col-span-6 flex flex-col justify-between border-b lg:border-b-0 lg:border-r border-white/15 p-4 sm:p-6 lg:p-7 bg-gradient-to-br from-slate-900/80 via-slate-900/50 to-emerald-950/45">
           <div>
             {/* Top Pill / Brand Logo & Badge */}
             <div className="flex items-center gap-3">
@@ -333,7 +343,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
             </div>
 
             {/* Grid of Users with Max Height and Custom Scroll */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-44 sm:max-h-48 overflow-y-auto pr-1">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-36 sm:max-h-48 overflow-y-auto pr-1">
               {filteredUsers.map((u) => {
                 const isCurrent = email.toLowerCase() === u.email.toLowerCase();
                 return (
@@ -533,6 +543,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                   <div className="relative">
                     <Lock className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-emerald-400" />
                     <input
+                      ref={passwordInputRef}
                       type={showPassword ? 'text' : 'password'}
                       required
                       value={password}
