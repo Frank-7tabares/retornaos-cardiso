@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlaskConical,
   Search,
@@ -102,6 +102,14 @@ export const ProductionEngineeringView: React.FC<
       : showCalidadGroup && !showComercialGroup
       ? 'CALIDAD'
       : semaforoArea;
+
+  // Siempre iniciar desde el principio (#1) al cambiar entre Calidad y Comercial o al cambiar de filtro
+  useEffect(() => {
+    const el = semaforoScrollRef.current;
+    if (el) {
+      el.scrollLeft = 0;
+    }
+  }, [effectiveSemaforoArea, causeFilter, selectedZoneFilter, selectedDateFilter, selectedLotFilter]);
 
   const scrollSemaforo = (dir: 'LEFT' | 'RIGHT') => {
     const el = semaforoScrollRef.current;
@@ -1014,6 +1022,7 @@ export const ProductionEngineeringView: React.FC<
           </div>
 
           <div
+            key={`semaforo-track-${effectiveSemaforoArea}`}
             ref={semaforoScrollRef}
             className="flex gap-3.5 overflow-x-auto pb-3 snap-x snap-mandatory scroll-smooth"
           >
@@ -1029,7 +1038,7 @@ export const ProductionEngineeringView: React.FC<
 
               return (
                 <div
-                  key={alert.productName}
+                  key={`${effectiveSemaforoArea}-${idx}-${alert.productName}`}
                   onClick={() =>
                     setSelectedProductFilter(
                       selectedProductFilter === alert.productName
