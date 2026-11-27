@@ -22,6 +22,10 @@ import {
   LayoutList,
   FileSpreadsheet,
   Calendar,
+  Award,
+  ArrowUpDown,
+  Users,
+  PackageCheck,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { BentoCard } from '../../components/ui/bento-card';
@@ -150,6 +154,18 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
   const [statusFilter, setStatusFilter] = useState<
     'ALL' | 'CUADRADO' | 'REVISAR' | 'JUSTIFICADO_NO_AVERIA'
   >('ALL');
+  const [clientRankingArea, setClientRankingArea] = useState<
+    'ALL' | 'COMERCIAL' | 'CALIDAD'
+  >('COMERCIAL');
+  const [clientRankingOrder, setClientRankingOrder] = useState<'DESC' | 'ASC'>(
+    'DESC'
+  );
+  const [productRankingArea, setProductRankingArea] = useState<
+    'ALL' | 'COMERCIAL' | 'CALIDAD'
+  >('COMERCIAL');
+  const [productRankingOrder, setProductRankingOrder] = useState<'DESC' | 'ASC'>(
+    'DESC'
+  );
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSavingMySQL, setIsSavingMySQL] = useState(false);
 
@@ -592,6 +608,277 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
     () => zoneRows.slice(0, visibleLimit),
     [zoneRows, visibleLimit]
   );
+
+  // =========================================================================
+  // 1. ESCALAFÓN DE CLIENTES (Del Primero al Último: Quién devuelve más Comercial y Calidad)
+  //    Si hay un Producto seleccionado (ej. CHORIZO LLANERO X 6), muestra exactamente qué clientes devolvieron ese producto y cuánta cantidad
+  // =========================================================================
+  const clientEscalafonList = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        clientName: string;
+        recordsCount: number;
+        totalUnits: number;
+        totalCOP: number;
+        commercialUnits: number;
+        commercialCOP: number;
+        qualityUnits: number;
+        qualityCOP: number;
+        proxVencerUnits: number;
+        vencidoUnits: number;
+        aCobrarUnits: number;
+        vacioUnits: number;
+        lechozoUnits: number;
+        xFechaUnits: number;
+        abombaUnits: number;
+        productsSet: Set<string>;
+      }
+    >();
+
+    for (const r of zoneRows) {
+      const name = (r.clientName || 'SIN CLIENTE').trim();
+      let entry = map.get(name);
+      if (!entry) {
+        entry = {
+          clientName: name,
+          recordsCount: 0,
+          totalUnits: 0,
+          totalCOP: 0,
+          commercialUnits: 0,
+          commercialCOP: 0,
+          qualityUnits: 0,
+          qualityCOP: 0,
+          proxVencerUnits: 0,
+          vencidoUnits: 0,
+          aCobrarUnits: 0,
+          vacioUnits: 0,
+          lechozoUnits: 0,
+          xFechaUnits: 0,
+          abombaUnits: 0,
+          productsSet: new Set<string>(),
+        };
+        map.set(name, entry);
+      }
+
+      const commU =
+        r.causes.proxVencer + r.causes.vencido + r.causes.aCobrar;
+      const qualU =
+        r.causes.vacio + r.causes.lechozo + r.causes.xFecha + r.causes.abomba;
+
+      entry.recordsCount += 1;
+      entry.totalUnits += commU + qualU;
+      entry.totalCOP += r.commercialValueCOP + r.qualityValueCOP;
+      entry.commercialUnits += commU;
+      entry.commercialCOP += r.commercialValueCOP;
+      entry.qualityUnits += qualU;
+      entry.qualityCOP += r.qualityValueCOP;
+      entry.proxVencerUnits += r.causes.proxVencer;
+      entry.vencidoUnits += r.causes.vencido;
+      entry.aCobrarUnits += r.causes.aCobrar;
+      entry.vacioUnits += r.causes.vacio;
+      entry.lechozoUnits += r.causes.lechozo;
+      entry.xFechaUnits += r.causes.xFecha;
+      entry.abombaUnits += r.causes.abomba;
+      if (r.productName) entry.productsSet.add(r.productName);
+    }
+
+    let list = Array.from(map.values());
+    if (clientRankingArea === 'COMERCIAL') {
+      list = list.filter((c) => c.commercialUnits > 0);
+    } else if (clientRankingArea === 'CALIDAD') {
+      list = list.filter((c) => c.qualityUnits > 0);
+    } else {
+      list = list.filter((c) => c.totalUnits > 0);
+    }
+
+    list.sort((a, b) => {
+      const uA =
+        clientRankingArea === 'COMERCIAL'
+          ? a.commercialUnits
+          : clientRankingArea === 'CALIDAD'
+          ? a.qualityUnits
+          : a.totalUnits;
+      const uB =
+        clientRankingArea === 'COMERCIAL'
+          ? b.commercialUnits
+          : clientRankingArea === 'CALIDAD'
+          ? b.qualityUnits
+          : b.totalUnits;
+      const copA =
+        clientRankingArea === 'COMERCIAL'
+          ? a.commercialCOP
+          : clientRankingArea === 'CALIDAD'
+          ? a.qualityCOP
+          : a.totalCOP;
+      const copB =
+        clientRankingArea === 'COMERCIAL'
+          ? b.commercialCOP
+          : clientRankingArea === 'CALIDAD'
+          ? b.qualityCOP
+          : b.totalCOP;
+
+      if (clientRankingOrder === 'DESC') {
+        return uB - uA || copB - copA || a.clientName.localeCompare(b.clientName);
+      }
+      return uA - uB || copA - copB || a.clientName.localeCompare(b.clientName);
+    });
+
+    const maxUnits =
+      Math.max(
+        1,
+        ...list.map((c) =>
+          clientRankingArea === 'COMERCIAL'
+            ? c.commercialUnits
+            : clientRankingArea === 'CALIDAD'
+            ? c.qualityUnits
+            : c.totalUnits
+        )
+      ) || 1;
+
+    return { list, maxUnits };
+  }, [zoneRows, clientRankingArea, clientRankingOrder]);
+
+  // =========================================================================
+  // 2. ESCALAFÓN DE PRODUCTOS (Del Primero al Último: Ej. Chorizo Llanero x 6 y todos los demás)
+  //    Con desglose de qué clientes devolvieron ese producto de mayor a menor
+  // =========================================================================
+  const productEscalafonList = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        productName: string;
+        recordsCount: number;
+        totalUnits: number;
+        totalCOP: number;
+        commercialUnits: number;
+        commercialCOP: number;
+        qualityUnits: number;
+        qualityCOP: number;
+        proxVencerUnits: number;
+        vencidoUnits: number;
+        aCobrarUnits: number;
+        vacioUnits: number;
+        lechozoUnits: number;
+        xFechaUnits: number;
+        abombaUnits: number;
+        clientsMap: Map<string, { client: string; commUnits: number; qualUnits: number; totalUnits: number }>;
+      }
+    >();
+
+    for (const r of zoneRows) {
+      const pName = (r.productName || 'SIN PRODUCTO').trim();
+      let entry = map.get(pName);
+      if (!entry) {
+        entry = {
+          productName: pName,
+          recordsCount: 0,
+          totalUnits: 0,
+          totalCOP: 0,
+          commercialUnits: 0,
+          commercialCOP: 0,
+          qualityUnits: 0,
+          qualityCOP: 0,
+          proxVencerUnits: 0,
+          vencidoUnits: 0,
+          aCobrarUnits: 0,
+          vacioUnits: 0,
+          lechozoUnits: 0,
+          xFechaUnits: 0,
+          abombaUnits: 0,
+          clientsMap: new Map(),
+        };
+        map.set(pName, entry);
+      }
+
+      const commU =
+        r.causes.proxVencer + r.causes.vencido + r.causes.aCobrar;
+      const qualU =
+        r.causes.vacio + r.causes.lechozo + r.causes.xFecha + r.causes.abomba;
+
+      entry.recordsCount += 1;
+      entry.totalUnits += commU + qualU;
+      entry.totalCOP += r.commercialValueCOP + r.qualityValueCOP;
+      entry.commercialUnits += commU;
+      entry.commercialCOP += r.commercialValueCOP;
+      entry.qualityUnits += qualU;
+      entry.qualityCOP += r.qualityValueCOP;
+      entry.proxVencerUnits += r.causes.proxVencer;
+      entry.vencidoUnits += r.causes.vencido;
+      entry.aCobrarUnits += r.causes.aCobrar;
+      entry.vacioUnits += r.causes.vacio;
+      entry.lechozoUnits += r.causes.lechozo;
+      entry.xFechaUnits += r.causes.xFecha;
+      entry.abombaUnits += r.causes.abomba;
+
+      const cName = (r.clientName || 'SIN CLIENTE').trim();
+      const prevClient = entry.clientsMap.get(cName) || {
+        client: cName,
+        commUnits: 0,
+        qualUnits: 0,
+        totalUnits: 0,
+      };
+      prevClient.commUnits += commU;
+      prevClient.qualUnits += qualU;
+      prevClient.totalUnits += commU + qualU;
+      entry.clientsMap.set(cName, prevClient);
+    }
+
+    let list = Array.from(map.values());
+    if (productRankingArea === 'COMERCIAL') {
+      list = list.filter((p) => p.commercialUnits > 0);
+    } else if (productRankingArea === 'CALIDAD') {
+      list = list.filter((p) => p.qualityUnits > 0);
+    } else {
+      list = list.filter((p) => p.totalUnits > 0);
+    }
+
+    list.sort((a, b) => {
+      const uA =
+        productRankingArea === 'COMERCIAL'
+          ? a.commercialUnits
+          : productRankingArea === 'CALIDAD'
+          ? a.qualityUnits
+          : a.totalUnits;
+      const uB =
+        productRankingArea === 'COMERCIAL'
+          ? b.commercialUnits
+          : productRankingArea === 'CALIDAD'
+          ? b.qualityUnits
+          : b.totalUnits;
+      const copA =
+        productRankingArea === 'COMERCIAL'
+          ? a.commercialCOP
+          : productRankingArea === 'CALIDAD'
+          ? a.qualityCOP
+          : a.totalCOP;
+      const copB =
+        productRankingArea === 'COMERCIAL'
+          ? b.commercialCOP
+          : productRankingArea === 'CALIDAD'
+          ? b.qualityCOP
+          : b.totalCOP;
+
+      if (productRankingOrder === 'DESC') {
+        return uB - uA || copB - copA || a.productName.localeCompare(b.productName);
+      }
+      return uA - uB || copA - copB || a.productName.localeCompare(b.productName);
+    });
+
+    const maxUnits =
+      Math.max(
+        1,
+        ...list.map((p) =>
+          productRankingArea === 'COMERCIAL'
+            ? p.commercialUnits
+            : productRankingArea === 'CALIDAD'
+            ? p.qualityUnits
+            : p.totalUnits
+        )
+      ) || 1;
+
+    return { list, maxUnits };
+  }, [zoneRows, productRankingArea, productRankingOrder]);
 
   const inspectedRow = useMemo(
     () => returnRows.find((r) => r.id === inspectedRowId) || null,
@@ -1713,6 +2000,482 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
             </button>
           ))}
         </div>
+      </div>
+
+      {/* ===================================================================== */}
+      {/* ESCALAFONES DEL VENDEDOR: 1. ESCALAFÓN DE CLIENTES & 2. DE PRODUCTOS  */}
+      {/* ===================================================================== */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* 1. ESCALAFÓN DE CLIENTES (Del 1° al Último por Comercial o Calidad) */}
+        <BentoCard noPadding className="overflow-hidden flex flex-col">
+          <div className="border-b border-neutral-200/70 dark:border-white/10 bg-slate-950/60 p-4 space-y-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-300">
+                  <Users className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-xs sm:text-sm font-bold text-neutral-900 dark:text-white truncate">
+                    1. Escalafón de Clientes ({clientEscalafonList.list.length} Clientes — Del 1° al Último)
+                  </h3>
+                  <p className="text-[11px] text-neutral-500 dark:text-slate-300 truncate">
+                    {productFilter !== 'ALL' ? (
+                      <>
+                        Clientes que devolvieron{' '}
+                        <strong className="text-sky-300">{productFilter}</strong>
+                      </>
+                    ) : (
+                      <>
+                        ¿Cuál es el cliente que más te devuelve por{' '}
+                        <strong>Comercial</strong> y por <strong>Calidad</strong>?
+                      </>
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setClientRankingOrder((prev) =>
+                    prev === 'DESC' ? 'ASC' : 'DESC'
+                  )
+                }
+                className="inline-flex items-center gap-1 rounded-xl border border-emerald-500/35 bg-emerald-500/15 hover:bg-emerald-500/25 px-2.5 py-1 text-[11px] font-bold text-emerald-300 transition-colors whitespace-nowrap shrink-0"
+              >
+                <ArrowUpDown className="h-3 w-3" />
+                {clientRankingOrder === 'DESC'
+                  ? 'Mayor a Menor ↓'
+                  : 'Menor a Mayor ↑'}
+              </button>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+              <div className="inline-flex rounded-xl border border-white/15 bg-slate-900 p-0.5 text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => setClientRankingArea('COMERCIAL')}
+                  className={`rounded-lg px-2.5 py-1 font-bold transition-all whitespace-nowrap ${
+                    clientRankingArea === 'COMERCIAL'
+                      ? 'bg-amber-500 text-slate-950 shadow-sm'
+                      : 'text-amber-300 hover:text-white'
+                  }`}
+                >
+                  🟠 Comercial (Próx · Venc · Cobrar)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setClientRankingArea('CALIDAD')}
+                  className={`rounded-lg px-2.5 py-1 font-bold transition-all whitespace-nowrap ${
+                    clientRankingArea === 'CALIDAD'
+                      ? 'bg-sky-500 text-slate-950 shadow-sm'
+                      : 'text-sky-300 hover:text-white'
+                  }`}
+                >
+                  🔵 Calidad (Vacío · Lech · Fecha)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setClientRankingArea('ALL')}
+                  className={`rounded-lg px-2.5 py-1 font-bold transition-all whitespace-nowrap ${
+                    clientRankingArea === 'ALL'
+                      ? 'bg-emerald-500 text-slate-950 shadow-sm'
+                      : 'text-slate-300 hover:text-white'
+                  }`}
+                >
+                  Todos
+                </button>
+              </div>
+
+              {productFilter !== 'ALL' && (
+                <button
+                  type="button"
+                  onClick={() => setProductFilter('ALL')}
+                  className="inline-flex items-center gap-1 rounded-lg border border-sky-500/40 bg-sky-500/20 px-2 py-0.5 text-[10px] font-bold text-sky-200 hover:bg-sky-500/30 whitespace-nowrap"
+                >
+                  Producto: {productFilter} ✕
+                </button>
+              )}
+            </div>
+          </div>
+
+          {clientEscalafonList.list.length === 0 ? (
+            <div className="p-6 text-center text-xs text-slate-400">
+              No hay clientes con devoluciones de{' '}
+              <strong>
+                {clientRankingArea === 'COMERCIAL'
+                  ? 'Comercial'
+                  : clientRankingArea === 'CALIDAD'
+                  ? 'Calidad'
+                  : 'este filtro'}
+              </strong>{' '}
+              en este rango.
+            </div>
+          ) : (
+            <div className="max-h-72 overflow-y-auto divide-y divide-neutral-200/50 dark:divide-white/[0.07] p-2.5 space-y-1.5">
+              {clientEscalafonList.list.map((c, idx) => {
+                const rankNum =
+                  clientRankingOrder === 'DESC'
+                    ? idx + 1
+                    : clientEscalafonList.list.length - idx;
+                const activeUnits =
+                  clientRankingArea === 'COMERCIAL'
+                    ? c.commercialUnits
+                    : clientRankingArea === 'CALIDAD'
+                    ? c.qualityUnits
+                    : c.totalUnits;
+                const activeCOP =
+                  clientRankingArea === 'COMERCIAL'
+                    ? c.commercialCOP
+                    : clientRankingArea === 'CALIDAD'
+                    ? c.qualityCOP
+                    : c.totalCOP;
+                const barPct = Math.max(
+                  5,
+                  Math.round((activeUnits / clientEscalafonList.maxUnits) * 100)
+                );
+                const isSelected = clientFilter === c.clientName;
+
+                return (
+                  <button
+                    key={`cli-esc-${c.clientName}`}
+                    type="button"
+                    onClick={() =>
+                      setClientFilter((prev) =>
+                        prev === c.clientName ? 'ALL' : c.clientName
+                      )
+                    }
+                    className={`w-full text-left rounded-xl p-2.5 transition-all ${
+                      isSelected
+                        ? 'bg-emerald-500/20 ring-1 ring-emerald-400'
+                        : 'hover:bg-white/[0.05]'
+                    }`}
+                    title={`Clic para filtrar la planilla por el cliente ${c.clientName}`}
+                  >
+                    <div className="flex items-center justify-between gap-2 text-xs">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="inline-flex h-5 px-1.5 shrink-0 items-center justify-center rounded-md bg-emerald-500/20 border border-emerald-500/30 font-mono text-[10px] font-bold text-emerald-300">
+                          #{rankNum}
+                        </span>
+                        <span className="font-bold text-neutral-900 dark:text-white truncate">
+                          {c.clientName}
+                        </span>
+                      </div>
+                      <div className="text-right shrink-0 font-mono">
+                        <span
+                          className={`font-extrabold ${
+                            clientRankingArea === 'COMERCIAL'
+                              ? 'text-amber-300'
+                              : clientRankingArea === 'CALIDAD'
+                              ? 'text-sky-300'
+                              : 'text-emerald-300'
+                          }`}
+                        >
+                          {formatNumber(activeUnits)} unds
+                        </span>
+                        <span className="text-[11px] text-slate-400 ml-1.5">
+                          ({formatCOP(activeCOP)})
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Desglose exacto según área seleccionada */}
+                    <div className="mt-1 flex flex-wrap items-center justify-between gap-2 text-[10px] font-mono text-slate-300">
+                      <div className="flex flex-wrap items-center gap-2">
+                        {(clientRankingArea === 'COMERCIAL' ||
+                          clientRankingArea === 'ALL') &&
+                          c.commercialUnits > 0 && (
+                            <span className="text-amber-300">
+                              🟠 Comercial: <strong>{c.commercialUnits}u</strong>{' '}
+                              (Próx:{c.proxVencerUnits} · Venc:{c.vencidoUnits} ·
+                              Cobrar:{c.aCobrarUnits})
+                            </span>
+                          )}
+                        {(clientRankingArea === 'CALIDAD' ||
+                          clientRankingArea === 'ALL') &&
+                          c.qualityUnits > 0 && (
+                            <span className="text-sky-300">
+                              🔵 Calidad: <strong>{c.qualityUnits}u</strong> (Vac:
+                              {c.vacioUnits} · Lech:{c.lechozoUnits} · Fec:
+                              {c.xFechaUnits} · Emb:{c.abombaUnits})
+                            </span>
+                          )}
+                      </div>
+                      <span className="text-slate-400">
+                        {c.productsSet.size} prod. · {c.recordsCount} reg.
+                      </span>
+                    </div>
+
+                    <div className="mt-1.5 h-1.5 w-full rounded-full bg-slate-800 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${
+                          clientRankingArea === 'COMERCIAL'
+                            ? 'bg-gradient-to-r from-amber-500 to-orange-400'
+                            : clientRankingArea === 'CALIDAD'
+                            ? 'bg-gradient-to-r from-sky-500 to-cyan-400'
+                            : 'bg-gradient-to-r from-emerald-500 to-teal-400'
+                        }`}
+                        style={{ width: `${barPct}%` }}
+                      />
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </BentoCard>
+
+        {/* 2. ESCALAFÓN DE PRODUCTOS (Ej. Chorizo Llanero x 6 del 1° al Último y quién lo devolvió) */}
+        <BentoCard noPadding className="overflow-hidden flex flex-col">
+          <div className="border-b border-neutral-200/70 dark:border-white/10 bg-slate-950/60 p-4 space-y-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-500/20 border border-amber-500/30 text-amber-300">
+                  <PackageCheck className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-xs sm:text-sm font-bold text-neutral-900 dark:text-white truncate">
+                    2. Escalafón de Productos ({productEscalafonList.list.length} Prod. — Del 1° al Último)
+                  </h3>
+                  <p className="text-[11px] text-neutral-500 dark:text-slate-300 truncate">
+                    Haz clic en cualquier producto (ej. <strong>CHORIZO LLANERO X 6</strong>) para ver a la izquierda qué clientes lo devolvieron del 1° al último.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setProductRankingOrder((prev) =>
+                    prev === 'DESC' ? 'ASC' : 'DESC'
+                  )
+                }
+                className="inline-flex items-center gap-1 rounded-xl border border-amber-500/35 bg-amber-500/15 hover:bg-amber-500/25 px-2.5 py-1 text-[11px] font-bold text-amber-300 transition-colors whitespace-nowrap shrink-0"
+              >
+                <ArrowUpDown className="h-3 w-3" />
+                {productRankingOrder === 'DESC'
+                  ? 'Mayor a Menor ↓'
+                  : 'Menor a Mayor ↑'}
+              </button>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+              <div className="inline-flex rounded-xl border border-white/15 bg-slate-900 p-0.5 text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProductRankingArea('COMERCIAL');
+                    setClientRankingArea('COMERCIAL');
+                  }}
+                  className={`rounded-lg px-2.5 py-1 font-bold transition-all whitespace-nowrap ${
+                    productRankingArea === 'COMERCIAL'
+                      ? 'bg-amber-500 text-slate-950 shadow-sm'
+                      : 'text-amber-300 hover:text-white'
+                  }`}
+                >
+                  🟠 Comercial (Próx · Venc · Cobrar)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProductRankingArea('CALIDAD');
+                    setClientRankingArea('CALIDAD');
+                  }}
+                  className={`rounded-lg px-2.5 py-1 font-bold transition-all whitespace-nowrap ${
+                    productRankingArea === 'CALIDAD'
+                      ? 'bg-sky-500 text-slate-950 shadow-sm'
+                      : 'text-sky-300 hover:text-white'
+                  }`}
+                >
+                  🔵 Calidad (Vacío · Lech · Fecha)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProductRankingArea('ALL');
+                    setClientRankingArea('ALL');
+                  }}
+                  className={`rounded-lg px-2.5 py-1 font-bold transition-all whitespace-nowrap ${
+                    productRankingArea === 'ALL'
+                      ? 'bg-emerald-500 text-slate-950 shadow-sm'
+                      : 'text-slate-300 hover:text-white'
+                  }`}
+                >
+                  Todos
+                </button>
+              </div>
+
+              {clientFilter !== 'ALL' && (
+                <button
+                  type="button"
+                  onClick={() => setClientFilter('ALL')}
+                  className="inline-flex items-center gap-1 rounded-lg border border-emerald-500/40 bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-200 hover:bg-emerald-500/30 whitespace-nowrap"
+                >
+                  Cliente: {clientFilter} ✕
+                </button>
+              )}
+            </div>
+          </div>
+
+          {productEscalafonList.list.length === 0 ? (
+            <div className="p-6 text-center text-xs text-slate-400">
+              No hay productos con devoluciones de{' '}
+              <strong>
+                {productRankingArea === 'COMERCIAL'
+                  ? 'Comercial'
+                  : productRankingArea === 'CALIDAD'
+                  ? 'Calidad'
+                  : 'este filtro'}
+              </strong>{' '}
+              en este rango.
+            </div>
+          ) : (
+            <div className="max-h-72 overflow-y-auto divide-y divide-neutral-200/50 dark:divide-white/[0.07] p-2.5 space-y-1.5">
+              {productEscalafonList.list.map((p, idx) => {
+                const rankNum =
+                  productRankingOrder === 'DESC'
+                    ? idx + 1
+                    : productEscalafonList.list.length - idx;
+                const activeUnits =
+                  productRankingArea === 'COMERCIAL'
+                    ? p.commercialUnits
+                    : productRankingArea === 'CALIDAD'
+                    ? p.qualityUnits
+                    : p.totalUnits;
+                const activeCOP =
+                  productRankingArea === 'COMERCIAL'
+                    ? p.commercialCOP
+                    : productRankingArea === 'CALIDAD'
+                    ? p.qualityCOP
+                    : p.totalCOP;
+                const barPct = Math.max(
+                  5,
+                  Math.round(
+                    (activeUnits / productEscalafonList.maxUnits) * 100
+                  )
+                );
+                const isSelected = productFilter === p.productName;
+
+                // Top 4 clientes que más devolvieron este producto en el área seleccionada
+                const topClientsForProd = Array.from(p.clientsMap.values())
+                  .map((cl) => ({
+                    client: cl.client,
+                    units:
+                      productRankingArea === 'COMERCIAL'
+                        ? cl.commUnits
+                        : productRankingArea === 'CALIDAD'
+                        ? cl.qualUnits
+                        : cl.totalUnits,
+                  }))
+                  .filter((cl) => cl.units > 0)
+                  .sort((a, b) => b.units - a.units);
+
+                return (
+                  <button
+                    key={`prod-esc-${p.productName}`}
+                    type="button"
+                    onClick={() =>
+                      setProductFilter((prev) =>
+                        prev === p.productName ? 'ALL' : p.productName
+                      )
+                    }
+                    className={`w-full text-left rounded-xl p-2.5 transition-all ${
+                      isSelected
+                        ? 'bg-amber-500/20 ring-1 ring-amber-400'
+                        : 'hover:bg-white/[0.05]'
+                    }`}
+                    title={`Clic para ver en el Escalafón de Clientes quiénes devolvieron ${p.productName} del 1° al último`}
+                  >
+                    <div className="flex items-center justify-between gap-2 text-xs">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="inline-flex h-5 px-1.5 shrink-0 items-center justify-center rounded-md bg-amber-500/20 border border-amber-500/30 font-mono text-[10px] font-bold text-amber-300">
+                          #{rankNum}
+                        </span>
+                        <span className="font-bold text-neutral-900 dark:text-white truncate">
+                          {p.productName}
+                        </span>
+                      </div>
+                      <div className="text-right shrink-0 font-mono">
+                        <span
+                          className={`font-extrabold ${
+                            productRankingArea === 'COMERCIAL'
+                              ? 'text-amber-300'
+                              : productRankingArea === 'CALIDAD'
+                              ? 'text-sky-300'
+                              : 'text-emerald-300'
+                          }`}
+                        >
+                          {formatNumber(activeUnits)} unds
+                        </span>
+                        <span className="text-[11px] text-slate-400 ml-1.5">
+                          ({formatCOP(activeCOP)})
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Desglose de causas y ranking de clientes de este producto */}
+                    <div className="mt-1 flex flex-wrap items-center justify-between gap-2 text-[10px] font-mono text-slate-300">
+                      <div className="flex flex-wrap items-center gap-2">
+                        {(productRankingArea === 'COMERCIAL' ||
+                          productRankingArea === 'ALL') &&
+                          p.commercialUnits > 0 && (
+                            <span className="text-amber-300">
+                              🟠 Próx:{p.proxVencerUnits} · Venc:{p.vencidoUnits}{' '}
+                              · Cobrar:{p.aCobrarUnits}
+                            </span>
+                          )}
+                        {(productRankingArea === 'CALIDAD' ||
+                          productRankingArea === 'ALL') &&
+                          p.qualityUnits > 0 && (
+                            <span className="text-sky-300">
+                              🔵 Vac:{p.vacioUnits} · Lech:{p.lechozoUnits} · Fec:
+                              {p.xFechaUnits} · Emb:{p.abombaUnits}
+                            </span>
+                          )}
+                      </div>
+                      <span className="text-slate-400">
+                        {topClientsForProd.length} cliente(s)
+                      </span>
+                    </div>
+
+                    {/* Mini-escalafón directo de quiénes devolvieron este producto (1° al último) */}
+                    {topClientsForProd.length > 0 && (
+                      <div className="mt-1 text-[10px] text-slate-300 truncate">
+                        <span className="text-slate-400">Clientes: </span>
+                        {topClientsForProd.slice(0, 4).map((cl, cIdx) => (
+                          <span key={cl.client} className="mr-2">
+                            <strong className="text-emerald-300">
+                              {cIdx + 1}°
+                            </strong>{' '}
+                            {cl.client} (<strong>{cl.units}u</strong>)
+                          </span>
+                        ))}
+                        {topClientsForProd.length > 4 && (
+                          <span className="text-indigo-300">
+                            +{topClientsForProd.length - 4} más (clic para ver todos)
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="mt-1.5 h-1.5 w-full rounded-full bg-slate-800 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${
+                          productRankingArea === 'COMERCIAL'
+                            ? 'bg-gradient-to-r from-amber-500 to-orange-400'
+                            : productRankingArea === 'CALIDAD'
+                            ? 'bg-gradient-to-r from-sky-500 to-cyan-400'
+                            : 'bg-gradient-to-r from-emerald-500 to-teal-400'
+                        }`}
+                        style={{ width: `${barPct}%` }}
+                      />
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </BentoCard>
       </div>
 
       {/* Main Data Card (Mobile Cards + Desktop Table) */}

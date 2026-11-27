@@ -82,10 +82,16 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
     'CODE_ASC' | 'SALES_DESC' | 'SALES_ASC' | 'TOTAL_DEV_DESC' | 'PCT_DESC' | 'COMM_DESC' | 'QUAL_DESC'
   >('CODE_ASC');
   const [salesRankingOrder, setSalesRankingOrder] = useState<'DESC' | 'ASC'>('DESC');
-  const [escalafonOrder, setEscalafonOrder] = useState<'ASC' | 'DESC'>('ASC');
+  const [escalafonOrder, setEscalafonOrder] = useState<'ASC' | 'DESC'>('DESC');
   const [escalafonCategory, setEscalafonCategory] = useState<
     'ALL' | 'COMERCIAL' | 'CALIDAD'
   >('ALL');
+  const [adminClientRankingArea, setAdminClientRankingArea] = useState<
+    'ALL' | 'COMERCIAL' | 'CALIDAD'
+  >('COMERCIAL');
+  const [adminClientRankingOrder, setAdminClientRankingOrder] = useState<
+    'DESC' | 'ASC'
+  >('DESC');
   const [showWorkflowBanner, setShowWorkflowBanner] = useState(true);
   const [selectedCauseKey, setSelectedCauseKey] =
     useState<ReturnCauseKey>('lechozo');
@@ -620,6 +626,151 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
       effectiveCategory,
     };
   }, [dateFilteredRows, escalafonOrder, escalafonCategory, dashCauseFilter]);
+
+  // Escalafón Global de Clientes (Del 1° al Último) por Comercial y Calidad (y por producto si hay producto seleccionado)
+  const adminClientEscalafonData = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        clientName: string;
+        zonesSet: Set<string>;
+        commercialUnits: number;
+        commercialCOP: number;
+        qualityUnits: number;
+        qualityCOP: number;
+        totalUnits: number;
+        totalCOP: number;
+        proxVencerUnits: number;
+        vencidoUnits: number;
+        aCobrarUnits: number;
+        vacioUnits: number;
+        lechozoUnits: number;
+        xFechaUnits: number;
+        abombaUnits: number;
+      }
+    >();
+
+    for (const r of dateFilteredRows) {
+      const cName = (r.clientName || 'SIN CLIENTE').trim();
+      let entry = map.get(cName);
+      if (!entry) {
+        entry = {
+          clientName: cName,
+          zonesSet: new Set<string>(),
+          commercialUnits: 0,
+          commercialCOP: 0,
+          qualityUnits: 0,
+          qualityCOP: 0,
+          totalUnits: 0,
+          totalCOP: 0,
+          proxVencerUnits: 0,
+          vencidoUnits: 0,
+          aCobrarUnits: 0,
+          vacioUnits: 0,
+          lechozoUnits: 0,
+          xFechaUnits: 0,
+          abombaUnits: 0,
+        };
+        map.set(cName, entry);
+      }
+
+      const mProx = isAdminCauseAllowed('proxVencer') ? r.causes.proxVencer : 0;
+      const mVenc = isAdminCauseAllowed('vencido') ? r.causes.vencido : 0;
+      const mCobrar = isAdminCauseAllowed('aCobrar') ? r.causes.aCobrar : 0;
+      const mVacio = isAdminCauseAllowed('vacio') ? r.causes.vacio : 0;
+      const mLech = isAdminCauseAllowed('lechozo') ? r.causes.lechozo : 0;
+      const mFec = isAdminCauseAllowed('xFecha') ? r.causes.xFecha : 0;
+      const mEmb = isAdminCauseAllowed('abomba') ? r.causes.abomba : 0;
+
+      const commU = mProx + mVenc + mCobrar;
+      const qualU = mVacio + mLech + mFec + mEmb;
+      const commCOP =
+        (mProx > 0 ? r.copByCause.proxVencer : 0) +
+        (mVenc > 0 ? r.copByCause.vencido : 0) +
+        (mCobrar > 0 ? r.copByCause.aCobrar : 0);
+      const qualCOP =
+        (mVacio > 0 ? r.copByCause.vacio : 0) +
+        (mLech > 0 ? r.copByCause.lechozo : 0) +
+        (mFec > 0 ? r.copByCause.xFecha : 0) +
+        (mEmb > 0 ? r.copByCause.abomba : 0);
+
+      if (commU + qualU <= 0) continue;
+
+      entry.zonesSet.add(r.zoneId);
+      entry.commercialUnits += commU;
+      entry.commercialCOP += commCOP;
+      entry.qualityUnits += qualU;
+      entry.qualityCOP += qualCOP;
+      entry.totalUnits += commU + qualU;
+      entry.totalCOP += commCOP + qualCOP;
+      entry.proxVencerUnits += mProx;
+      entry.vencidoUnits += mVenc;
+      entry.aCobrarUnits += mCobrar;
+      entry.vacioUnits += mVacio;
+      entry.lechozoUnits += mLech;
+      entry.xFechaUnits += mFec;
+      entry.abombaUnits += mEmb;
+    }
+
+    let list = Array.from(map.values());
+    if (adminClientRankingArea === 'COMERCIAL') {
+      list = list.filter((c) => c.commercialUnits > 0);
+    } else if (adminClientRankingArea === 'CALIDAD') {
+      list = list.filter((c) => c.qualityUnits > 0);
+    } else {
+      list = list.filter((c) => c.totalUnits > 0);
+    }
+
+    list.sort((a, b) => {
+      const uA =
+        adminClientRankingArea === 'COMERCIAL'
+          ? a.commercialUnits
+          : adminClientRankingArea === 'CALIDAD'
+          ? a.qualityUnits
+          : a.totalUnits;
+      const uB =
+        adminClientRankingArea === 'COMERCIAL'
+          ? b.commercialUnits
+          : adminClientRankingArea === 'CALIDAD'
+          ? b.qualityUnits
+          : b.totalUnits;
+      const copA =
+        adminClientRankingArea === 'COMERCIAL'
+          ? a.commercialCOP
+          : adminClientRankingArea === 'CALIDAD'
+          ? a.qualityCOP
+          : a.totalCOP;
+      const copB =
+        adminClientRankingArea === 'COMERCIAL'
+          ? b.commercialCOP
+          : adminClientRankingArea === 'CALIDAD'
+          ? b.qualityCOP
+          : b.totalCOP;
+      if (adminClientRankingOrder === 'DESC') {
+        return uB - uA || copB - copA || a.clientName.localeCompare(b.clientName);
+      }
+      return uA - uB || copA - copB || a.clientName.localeCompare(b.clientName);
+    });
+
+    const maxUnits =
+      Math.max(
+        1,
+        ...list.map((c) =>
+          adminClientRankingArea === 'COMERCIAL'
+            ? c.commercialUnits
+            : adminClientRankingArea === 'CALIDAD'
+            ? c.qualityUnits
+            : c.totalUnits
+        )
+      ) || 1;
+
+    return { list, maxUnits };
+  }, [
+    dateFilteredRows,
+    adminClientRankingArea,
+    adminClientRankingOrder,
+    dashCauseFilter,
+  ]);
 
   // Ranking completo de TODAS las zonas según sus ventas mensuales (de mayor a menor o menor a mayor)
   const zoneSalesRanking = useMemo(() => {
@@ -1349,8 +1500,8 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
             </div>
           </div>
 
-          {/* 3 Tarjetas de Resumen Rápido: Ranking Completo de Todas las Zonas por Ventas, Críticos Lechosidad/Vacío y Comercial */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {/* 4 Tarjetas de Resumen Rápido: 1. Ventas por Zona, 2. Productos Calidad, 3. Productos Comercial (ej. Llanero x 6), 4. Escalafón de Clientes (1° al último) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
             <div className="rounded-2xl border border-emerald-500/30 bg-slate-900/95 p-3.5 space-y-2">
               <div className="flex items-center justify-between gap-2 text-[11px] font-bold uppercase tracking-wider text-emerald-400">
                 <span className="flex items-center gap-1">
@@ -1604,6 +1755,160 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
                         <div className="mt-1 h-1.5 w-full rounded-full bg-slate-800 overflow-hidden">
                           <div
                             className="h-full rounded-full bg-gradient-to-r from-amber-500 to-orange-400"
+                            style={{ width: `${barPct}%` }}
+                          />
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* 4. Escalafón de Clientes (Del 1° al Último: Quién devuelve más Comercial / Calidad o del producto seleccionado ej. Llanero x 6) */}
+            <div className="rounded-2xl border border-indigo-500/35 bg-slate-900/95 p-3.5 space-y-2">
+              <div className="flex items-center justify-between gap-1.5 text-[11px] font-bold uppercase tracking-wider text-indigo-300">
+                <span className="truncate">
+                  👤 Escalafón Clientes ({adminClientEscalafonData.list.length})
+                </span>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setAdminClientRankingArea((prev) =>
+                        prev === 'COMERCIAL'
+                          ? 'CALIDAD'
+                          : prev === 'CALIDAD'
+                          ? 'ALL'
+                          : 'COMERCIAL'
+                      )
+                    }
+                    className={`rounded-lg border px-1.5 py-0.5 text-[9px] font-bold transition-colors ${
+                      adminClientRankingArea === 'COMERCIAL'
+                        ? 'border-amber-400/50 bg-amber-500/20 text-amber-300'
+                        : adminClientRankingArea === 'CALIDAD'
+                        ? 'border-sky-400/50 bg-sky-500/20 text-sky-300'
+                        : 'border-emerald-400/50 bg-emerald-500/20 text-emerald-300'
+                    }`}
+                    title="Alternar entre Comercial, Calidad o Todos"
+                  >
+                    {adminClientRankingArea === 'COMERCIAL'
+                      ? '🟠 Comercial'
+                      : adminClientRankingArea === 'CALIDAD'
+                      ? '🔵 Calidad'
+                      : '🟢 Todos'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setAdminClientRankingOrder((prev) =>
+                        prev === 'DESC' ? 'ASC' : 'DESC'
+                      )
+                    }
+                    className="rounded-lg border border-indigo-500/35 bg-indigo-500/15 hover:bg-indigo-500/25 px-1.5 py-0.5 text-[9px] font-bold text-indigo-300"
+                    title="Ordenar de Mayor a Menor / Menor a Mayor"
+                  >
+                    {adminClientRankingOrder === 'DESC' ? '1°→Últ ↓' : 'Últ→1° ↑'}
+                  </button>
+                </div>
+              </div>
+
+              {dashProductFilter !== 'ALL' && (
+                <div className="flex items-center justify-between rounded-lg bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 text-[10px] text-amber-200">
+                  <span className="truncate">
+                    Prod: <strong>{dashProductFilter}</strong>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setDashProductFilter('ALL')}
+                    className="ml-1 font-bold text-amber-300 hover:text-white"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+
+              {adminClientEscalafonData.list.length === 0 ? (
+                <div className="py-6 text-center text-xs text-slate-400">
+                  Sin clientes para el filtro actual
+                </div>
+              ) : (
+                <div className="max-h-48 overflow-y-auto pr-1 space-y-1.5 divide-y divide-white/[0.06]">
+                  {adminClientEscalafonData.list.map((cli, idx) => {
+                    const rankNum =
+                      adminClientRankingOrder === 'DESC'
+                        ? idx + 1
+                        : adminClientEscalafonData.list.length - idx;
+                    const activeU =
+                      adminClientRankingArea === 'COMERCIAL'
+                        ? cli.commercialUnits
+                        : adminClientRankingArea === 'CALIDAD'
+                        ? cli.qualityUnits
+                        : cli.totalUnits;
+                    const activeCOP =
+                      adminClientRankingArea === 'COMERCIAL'
+                        ? cli.commercialCOP
+                        : adminClientRankingArea === 'CALIDAD'
+                        ? cli.qualityCOP
+                        : cli.totalCOP;
+                    const barPct = Math.max(
+                      6,
+                      Math.round(
+                        (activeU / adminClientEscalafonData.maxUnits) * 100
+                      )
+                    );
+                    const isSelectedCli = dashClientFilter === cli.clientName;
+
+                    return (
+                      <button
+                        key={`adm-cli-${cli.clientName}`}
+                        type="button"
+                        onClick={() =>
+                          setDashClientFilter((prev) =>
+                            prev === cli.clientName ? 'ALL' : cli.clientName
+                          )
+                        }
+                        className={`w-full text-left pt-1.5 first:pt-0 rounded-lg px-1.5 py-1 transition-colors ${
+                          isSelectedCli
+                            ? 'bg-indigo-500/25 ring-1 ring-indigo-400'
+                            : 'hover:bg-white/[0.05]'
+                        }`}
+                        title={`Clic para filtrar todo el dashboard por el cliente ${cli.clientName}`}
+                      >
+                        <div className="flex items-center justify-between text-xs gap-2">
+                          <span className="text-slate-200 truncate font-medium">
+                            <span className="font-mono text-[10px] font-bold text-indigo-400 mr-1.5">
+                              #{rankNum}
+                            </span>
+                            {cli.clientName}
+                          </span>
+                          <span className="font-mono font-bold text-indigo-300 shrink-0">
+                            {formatNumber(activeU)} unds
+                          </span>
+                        </div>
+                        <div className="mt-0.5 flex flex-wrap items-center justify-between text-[10px] font-mono text-slate-300">
+                          <div className="flex items-center gap-1.5">
+                            {cli.commercialUnits > 0 && (
+                              <span className="text-amber-300">
+                                Com: <strong>{cli.commercialUnits}u</strong>
+                              </span>
+                            )}
+                            {cli.qualityUnits > 0 && (
+                              <span className="text-sky-300">
+                                Cal: <strong>{cli.qualityUnits}u</strong>
+                              </span>
+                            )}
+                            <span className="text-slate-400">
+                              ({Array.from(cli.zonesSet).join(', ')})
+                            </span>
+                          </div>
+                          <span className="text-slate-400">
+                            {formatCOP(activeCOP)}
+                          </span>
+                        </div>
+                        <div className="mt-1 h-1.5 w-full rounded-full bg-slate-800 overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-400"
                             style={{ width: `${barPct}%` }}
                           />
                         </div>
