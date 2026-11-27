@@ -2007,12 +2007,12 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
         {/* 1. ESCALAFÓN DE CLIENTES (Del 1° al Último por Comercial o Calidad) */}
         <BentoCard noPadding className="overflow-hidden flex flex-col">
           <div className="border-b border-neutral-200/70 dark:border-white/10 bg-slate-950/60 p-4 space-y-2.5">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2 min-w-0">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-300">
                   <Users className="h-4 w-4" />
                 </div>
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <h3 className="text-xs sm:text-sm font-bold text-neutral-900 dark:text-white truncate">
                     1. Escalafón de Clientes ({clientEscalafonList.list.length} Clientes — Del 1° al Último)
                   </h3>
@@ -2226,17 +2226,27 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
         {/* 2. ESCALAFÓN DE PRODUCTOS (Ej. Chorizo Llanero x 6 del 1° al Último y quién lo devolvió) */}
         <BentoCard noPadding className="overflow-hidden flex flex-col">
           <div className="border-b border-neutral-200/70 dark:border-white/10 bg-slate-950/60 p-4 space-y-2.5">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2 min-w-0">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-500/20 border border-amber-500/30 text-amber-300">
                   <PackageCheck className="h-4 w-4" />
                 </div>
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <h3 className="text-xs sm:text-sm font-bold text-neutral-900 dark:text-white truncate">
                     2. Escalafón de Productos ({productEscalafonList.list.length} Prod. — Del 1° al Último)
                   </h3>
                   <p className="text-[11px] text-neutral-500 dark:text-slate-300 truncate">
-                    Haz clic en cualquier producto (ej. <strong>CHORIZO LLANERO X 6</strong>) para ver a la izquierda qué clientes lo devolvieron del 1° al último.
+                    {clientFilter !== 'ALL' ? (
+                      <>
+                        Productos devueltos por{' '}
+                        <strong className="text-emerald-300">{clientFilter}</strong>
+                      </>
+                    ) : (
+                      <>
+                        ¿Cuál es el producto que más devuelven por{' '}
+                        <strong>Comercial</strong> y por <strong>Calidad</strong>?
+                      </>
+                    )}
                   </p>
                 </div>
               </div>
@@ -2411,50 +2421,32 @@ export const ReturnsWorkbench: React.FC<ReturnsWorkbenchProps> = ({
                       </div>
                     </div>
 
-                    {/* Desglose de causas y ranking de clientes de este producto */}
+                    {/* Desglose exacto según área seleccionada */}
                     <div className="mt-1 flex flex-wrap items-center justify-between gap-2 text-[10px] font-mono text-slate-300">
                       <div className="flex flex-wrap items-center gap-2">
                         {(productRankingArea === 'COMERCIAL' ||
                           productRankingArea === 'ALL') &&
                           p.commercialUnits > 0 && (
                             <span className="text-amber-300">
-                              🟠 Próx:{p.proxVencerUnits} · Venc:{p.vencidoUnits}{' '}
-                              · Cobrar:{p.aCobrarUnits}
+                              🟠 Comercial: <strong>{p.commercialUnits}u</strong>{' '}
+                              (Próx:{p.proxVencerUnits} · Venc:{p.vencidoUnits} ·
+                              Cobrar:{p.aCobrarUnits})
                             </span>
                           )}
                         {(productRankingArea === 'CALIDAD' ||
                           productRankingArea === 'ALL') &&
                           p.qualityUnits > 0 && (
                             <span className="text-sky-300">
-                              🔵 Vac:{p.vacioUnits} · Lech:{p.lechozoUnits} · Fec:
-                              {p.xFechaUnits} · Emb:{p.abombaUnits}
+                              🔵 Calidad: <strong>{p.qualityUnits}u</strong> (Vac:
+                              {p.vacioUnits} · Lech:{p.lechozoUnits} · Fec:
+                              {p.xFechaUnits} · Emb:{p.abombaUnits})
                             </span>
                           )}
                       </div>
                       <span className="text-slate-400">
-                        {topClientsForProd.length} cliente(s)
+                        {topClientsForProd.length} cli. · {p.recordsCount} reg.
                       </span>
                     </div>
-
-                    {/* Mini-escalafón directo de quiénes devolvieron este producto (1° al último) */}
-                    {topClientsForProd.length > 0 && (
-                      <div className="mt-1 text-[10px] text-slate-300 truncate">
-                        <span className="text-slate-400">Clientes: </span>
-                        {topClientsForProd.slice(0, 4).map((cl, cIdx) => (
-                          <span key={cl.client} className="mr-2">
-                            <strong className="text-emerald-300">
-                              {cIdx + 1}°
-                            </strong>{' '}
-                            {cl.client} (<strong>{cl.units}u</strong>)
-                          </span>
-                        ))}
-                        {topClientsForProd.length > 4 && (
-                          <span className="text-indigo-300">
-                            +{topClientsForProd.length - 4} más (clic para ver todos)
-                          </span>
-                        )}
-                      </div>
-                    )}
 
                     <div className="mt-1.5 h-1.5 w-full rounded-full bg-slate-800 overflow-hidden">
                       <div
