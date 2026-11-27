@@ -859,18 +859,18 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Visual Hero Banner with Nature / Farm / Countryside Atmosphere & Glass Overlay */}
+      {/* Visual Hero Banner with Nature / Farm / Countryside Atmosphere & Clear Image Visibility */}
       <div className="relative overflow-hidden rounded-3xl border border-white/25 dark:border-white/15 shadow-2xl">
         <img
           src="https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=1800&q=80"
           alt="Campo y Granja Agroalimentaria"
-          className="absolute inset-0 h-full w-full object-cover object-center scale-105 transition-transform duration-700"
+          className="absolute inset-0 h-full w-full object-cover object-center"
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-slate-950/90 via-slate-950/75 to-emerald-950/45" />
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-950/80 via-slate-950/50 to-slate-950/30" />
 
-        <div className="relative z-10 flex flex-col gap-6 p-6 sm:p-8 lg:flex-row lg:items-center lg:justify-between">
-          <div className="max-w-2xl space-y-2.5">
+        <div className="relative z-10 flex flex-col gap-3.5 px-5 py-4 sm:px-7 sm:py-5">
+          {/* Top Bar: Badges on Left + Action Buttons on Right */}
+          <div className="flex flex-wrap items-center justify-between gap-2.5">
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="success" dot>
                 📅 Cambios actualizados hasta el día: {maxDate}
@@ -879,41 +879,45 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
                 Rango activo: {effectiveDateFrom} al {effectiveDateTo} · Control por Zonas
               </span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-              Centro de Control Gerencial por Zonas, Inventarios y Lotes
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-200/95 leading-relaxed">
-              Información actualizada hasta el <strong>{maxDate}</strong>. Filtra por <strong>Rango de Día a Día</strong> (ej. del 1 al 17 sin el 18), analiza el rendimiento por <strong>Zonas Oficiales (Z01–Z16)</strong> y consulta el <strong>Escalafón de Productos</strong> para bajar inventarios.
-            </p>
-          </div>
 
-          <div className="flex flex-wrap items-center gap-3 shrink-0">
-            {onOpenExecutiveReport && (
+            <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+              {onOpenExecutiveReport && (
+                <button
+                  type="button"
+                  onClick={onOpenExecutiveReport}
+                  className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 border border-emerald-300/40 px-3.5 py-2 text-xs font-bold text-white shadow-lg shadow-emerald-600/30 transition-all duration-200"
+                >
+                  <Printer className="h-4 w-4" />
+                  Generar Informe Detallado (Sebastián)
+                </button>
+              )}
               <button
                 type="button"
-                onClick={onOpenExecutiveReport}
-                className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 border border-emerald-300/40 px-4 py-2.5 text-xs font-bold text-white shadow-xl shadow-emerald-600/30 transition-all duration-200 hover:-translate-y-0.5"
+                onClick={onOpenQuickGuide}
+                className="inline-flex items-center gap-2 rounded-xl border border-white/30 bg-slate-950/45 hover:bg-slate-950/65 backdrop-blur-md px-3.5 py-2 text-xs font-semibold text-white shadow-md transition-all duration-200"
               >
-                <Printer className="h-4 w-4" />
-                Generar Informe Detallado (Sebastián)
+                <HelpCircle className="h-4 w-4 text-emerald-300" />
+                Guía Fácil
               </button>
-            )}
-            <button
-              type="button"
-              onClick={onOpenQuickGuide}
-              className="inline-flex items-center gap-2 rounded-2xl border border-white/25 bg-white/15 hover:bg-white/25 backdrop-blur-xl px-4 py-2.5 text-xs font-semibold text-white shadow-lg transition-all duration-200 hover:-translate-y-0.5"
-            >
-              <HelpCircle className="h-4 w-4 text-emerald-300" />
-              Guía Fácil
-            </button>
-            <button
-              type="button"
-              onClick={() => onSelectZone('Z01')}
-              className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 hover:bg-indigo-500 px-4 py-2.5 text-xs font-semibold text-white shadow-lg shadow-indigo-600/30 transition-all duration-200 hover:-translate-y-0.5"
-            >
-              <Camera className="h-4 w-4" />
-              Ir a Planilla / Lotes
-            </button>
+              <button
+                type="button"
+                onClick={() => onSelectZone('Z01')}
+                className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 px-3.5 py-2 text-xs font-semibold text-white shadow-lg shadow-indigo-600/30 transition-all duration-200"
+              >
+                <Camera className="h-4 w-4" />
+                Ir a Planilla / Lotes
+              </button>
+            </div>
+          </div>
+
+          {/* Bottom Bar: Full-width Title & Compact Subtitle */}
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white drop-shadow">
+              Centro de Control Gerencial por Zonas, Inventarios y Lotes
+            </h1>
+            <p className="mt-1 text-xs sm:text-sm text-slate-100/95 leading-snug drop-shadow">
+              Información actualizada hasta el <strong>{maxDate}</strong>. Filtra por <strong>Rango de Día a Día</strong> (ej. del 1 al 17 sin el 18), analiza el rendimiento por <strong>Zonas Oficiales (Z01–Z16)</strong> y consulta el <strong>Escalafón de Productos y Clientes</strong> para bajar inventarios.
+            </p>
           </div>
         </div>
       </div>
@@ -1284,22 +1288,29 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
       {/* Row 1: 4 Primary KPI Bento Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <BentoCard interactive className="group flex flex-col justify-between">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <span className="block text-xs font-medium text-neutral-600 dark:text-slate-300">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0 flex-1 space-y-1.5">
+              <span className="block text-xs font-semibold text-neutral-600 dark:text-slate-200">
                 Costo Total Devoluciones
               </span>
-              <div className="mt-2.5 text-2xl font-bold tracking-tight text-neutral-900 dark:text-white font-mono">
-                {formatCOP(totals.totalCOP)}
+              <div>
+                <Badge variant="indigo" className="whitespace-nowrap">
+                  Consolidado General
+                </Badge>
               </div>
             </div>
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-indigo-500/30 bg-indigo-500/15 text-indigo-500 dark:text-indigo-300">
               <TrendingDown className="h-5 w-5" />
             </div>
           </div>
-          <div className="mt-4 flex items-center justify-between gap-2 border-t border-neutral-200/60 dark:border-white/10 pt-3 text-xs">
-            <span className="text-neutral-600 dark:text-slate-300 truncate">
-              Sobre Ventas ({formatCompactCOP(totals.salesCOP)})
+
+          <div className="mt-3 text-2xl font-bold tracking-tight text-neutral-900 dark:text-white font-mono">
+            {formatCOP(totals.totalCOP)}
+          </div>
+
+          <div className="mt-3.5 flex items-center justify-between gap-3 border-t border-neutral-200/60 dark:border-white/10 pt-3 text-xs">
+            <span className="text-neutral-600 dark:text-slate-300 whitespace-nowrap">
+              Ventas: <strong>{formatCompactCOP(totals.salesCOP)}</strong>
             </span>
             <Badge
               variant={totals.pctTotalOverSales > 6 ? 'warning' : 'indigo'}
@@ -1312,62 +1323,66 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
         </BentoCard>
 
         <BentoCard interactive className="flex flex-col justify-between">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-medium text-neutral-600 dark:text-slate-300">
-                  Resp. Comercial
-                </span>
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0 flex-1 space-y-1.5">
+              <span className="block text-xs font-semibold text-neutral-600 dark:text-slate-200">
+                Responsabilidad Comercial
+              </span>
+              <div>
                 <TooltipHint label="Suma: Por Cobrar + Próximo a Vencer + Vencido">
                   <Badge variant="commercial" className="whitespace-nowrap">
-                    Comercial
+                    Comercial (Ventas)
                   </Badge>
                 </TooltipHint>
-              </div>
-              <div className="mt-2.5 text-2xl font-bold tracking-tight text-amber-600 dark:text-amber-300 font-mono">
-                {formatCOP(totals.commercialCOP)}
               </div>
             </div>
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-amber-500/30 bg-amber-500/15 text-amber-500 dark:text-amber-300">
               <Briefcase className="h-5 w-5" />
             </div>
           </div>
-          <div className="mt-4 flex items-center justify-between gap-2 border-t border-neutral-200/60 dark:border-white/10 pt-3 text-xs">
-            <span className="text-neutral-600 dark:text-slate-300 truncate">
-              {formatNumber(totals.commercialUnits)} unds (PR/V, Cobrar, Venc.)
+
+          <div className="mt-3 text-2xl font-bold tracking-tight text-amber-600 dark:text-amber-300 font-mono">
+            {formatCOP(totals.commercialCOP)}
+          </div>
+
+          <div className="mt-3.5 flex items-center justify-between gap-3 border-t border-neutral-200/60 dark:border-white/10 pt-3 text-xs">
+            <span className="text-neutral-600 dark:text-slate-300 whitespace-nowrap">
+              <strong>{formatNumber(totals.commercialUnits)} unds</strong> (Próx · Venc · Cobrar)
             </span>
-            <span className="shrink-0 whitespace-nowrap font-semibold text-amber-600 dark:text-amber-300">
+            <span className="shrink-0 whitespace-nowrap font-bold text-amber-600 dark:text-amber-300">
               {formatPercent(totals.pctCommShare, 1)} del total
             </span>
           </div>
         </BentoCard>
 
         <BentoCard interactive className="flex flex-col justify-between">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-medium text-neutral-600 dark:text-slate-300">
-                  Resp. Calidad
-                </span>
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0 flex-1 space-y-1.5">
+              <span className="block text-xs font-semibold text-neutral-600 dark:text-slate-200">
+                Responsabilidad Calidad
+              </span>
+              <div>
                 <TooltipHint label="Suma: Vacío + Por Fecha + Abombamiento + Lechoso">
                   <Badge variant="quality" className="whitespace-nowrap">
                     Planta / Calidad
                   </Badge>
                 </TooltipHint>
               </div>
-              <div className="mt-2.5 text-2xl font-bold tracking-tight text-sky-600 dark:text-sky-300 font-mono">
-                {formatCOP(totals.qualityCOP)}
-              </div>
             </div>
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-sky-500/30 bg-sky-500/15 text-sky-500 dark:text-sky-300">
               <FlaskConical className="h-5 w-5" />
             </div>
           </div>
-          <div className="mt-4 flex items-center justify-between gap-2 border-t border-neutral-200/60 dark:border-white/10 pt-3 text-xs">
-            <span className="text-neutral-600 dark:text-slate-300 truncate">
-              {formatNumber(totals.qualityUnits)} unds (Lechoso, Vacío, Fecha)
+
+          <div className="mt-3 text-2xl font-bold tracking-tight text-sky-600 dark:text-sky-300 font-mono">
+            {formatCOP(totals.qualityCOP)}
+          </div>
+
+          <div className="mt-3.5 flex items-center justify-between gap-3 border-t border-neutral-200/60 dark:border-white/10 pt-3 text-xs">
+            <span className="text-neutral-600 dark:text-slate-300 whitespace-nowrap">
+              <strong>{formatNumber(totals.qualityUnits)} unds</strong> (Vacío · Lech · Fecha)
             </span>
-            <span className="shrink-0 whitespace-nowrap font-semibold text-sky-600 dark:text-sky-300">
+            <span className="shrink-0 whitespace-nowrap font-bold text-sky-600 dark:text-sky-300">
               {formatPercent(totals.pctQualShare, 1)} del total
             </span>
           </div>
@@ -1378,25 +1393,32 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
           onClick={() => onSelectZone('PDV-SABANETA')}
           className="flex flex-col justify-between"
         >
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <span className="block text-xs font-medium text-neutral-600 dark:text-slate-300">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0 flex-1 space-y-1.5">
+              <span className="block text-xs font-semibold text-neutral-600 dark:text-slate-200">
                 Unidades & Auditoría Cuadre
               </span>
-              <div className="mt-2.5 text-2xl font-bold tracking-tight text-neutral-900 dark:text-white font-mono">
-                {formatNumber(totals.totalUnits)}{' '}
-                <span className="text-sm font-normal text-neutral-500 dark:text-slate-400">
-                  unds
-                </span>
+              <div>
+                <Badge variant="success" className="whitespace-nowrap">
+                  Control de Planilla
+                </Badge>
               </div>
             </div>
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-emerald-500/30 bg-emerald-500/15 text-emerald-500 dark:text-emerald-300">
               <ShieldAlert className="h-5 w-5" />
             </div>
           </div>
-          <div className="mt-4 flex items-center justify-between gap-2 border-t border-neutral-200/60 dark:border-white/10 pt-3 text-xs">
-            <span className="text-neutral-600 dark:text-slate-300 truncate">
-              {formatNumber(totals.lineItems)} registros procesados
+
+          <div className="mt-3 text-2xl font-bold tracking-tight text-neutral-900 dark:text-white font-mono">
+            {formatNumber(totals.totalUnits)}{' '}
+            <span className="text-sm font-normal text-neutral-500 dark:text-slate-400">
+              unds
+            </span>
+          </div>
+
+          <div className="mt-3.5 flex items-center justify-between gap-3 border-t border-neutral-200/60 dark:border-white/10 pt-3 text-xs">
+            <span className="text-neutral-600 dark:text-slate-300 whitespace-nowrap">
+              <strong>{formatNumber(totals.lineItems)}</strong> registros
             </span>
             {unconciledCount > 0 ? (
               <Badge variant="warning" dot className="shrink-0 whitespace-nowrap">
@@ -1416,75 +1438,71 @@ export const BentoDashboard: React.FC<BentoDashboardProps> = ({
       {/* ===================================================================== */}
       <BentoCard noPadding className="overflow-hidden">
         <div className="border-b border-neutral-200/70 dark:border-white/10 bg-slate-950/50 p-4 sm:p-5 space-y-3.5">
-          <div className="flex flex-col gap-3">
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <PackageCheck className="h-4 w-4 text-emerald-400 shrink-0" />
-                <h2 className="text-base font-bold text-neutral-900 dark:text-white">
-                  Escalafón de Productos Devueltos por Calidad y Comercial ({escalafonOrder === 'ASC' ? 'De Menor a Mayor ↑' : 'De Mayor a Menor ↓'})
-                </h2>
-                <Badge variant="success" dot className="whitespace-nowrap">
-                  Rango: {effectiveDateFrom} al {effectiveDateTo}
-                </Badge>
-              </div>
-              <p className="text-xs text-neutral-600 dark:text-slate-300">
-                Calidad (Lechosidad, Vacío) y Comercial (Próx. a Vencer, A Cobrar) para ajustar inventarios y planta.
-              </p>
+          <div className="flex flex-col items-center text-center gap-2.5">
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <PackageCheck className="h-4 w-4 text-emerald-400 shrink-0" />
+              <h2 className="text-base font-bold text-neutral-900 dark:text-white">
+                Escalafón de Productos Devueltos por Calidad y Comercial ({escalafonOrder === 'ASC' ? 'De Menor a Mayor ↑' : 'De Mayor a Menor ↓'})
+              </h2>
+              <Badge variant="success" dot className="whitespace-nowrap">
+                Rango: {effectiveDateFrom} al {effectiveDateTo}
+              </Badge>
             </div>
+            <p className="text-xs text-neutral-600 dark:text-slate-300 max-w-3xl">
+              Resumen ordenado de productos y clientes por <strong>Calidad (Lechosidad, Vacío)</strong> y <strong>Comercial (Próx. a Vencer, A Cobrar)</strong> para bajar inventarios en ruta y tomar correctivos en planta.
+            </p>
 
-            <div className="flex flex-wrap items-center justify-between gap-2.5 pt-1 border-t border-white/[0.06]">
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="inline-flex rounded-xl border border-white/15 bg-slate-900 p-1">
+            <div className="flex flex-wrap items-center justify-center gap-2.5 pt-2 w-full border-t border-white/[0.06]">
+              <div className="inline-flex rounded-xl border border-white/15 bg-slate-900 p-1">
+                <button
+                  type="button"
+                  onClick={() => setEscalafonOrder('ASC')}
+                  className={`inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold transition-all whitespace-nowrap ${
+                    escalafonOrder === 'ASC'
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'text-slate-300 hover:text-white'
+                  }`}
+                >
+                  <ArrowUpDown className="h-3.5 w-3.5" />
+                  De Menor a Mayor (↑)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEscalafonOrder('DESC')}
+                  className={`inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold transition-all whitespace-nowrap ${
+                    escalafonOrder === 'DESC'
+                      ? 'bg-indigo-600 text-white shadow-sm'
+                      : 'text-slate-300 hover:text-white'
+                  }`}
+                >
+                  <ArrowUpDown className="h-3.5 w-3.5" />
+                  De Mayor a Menor (↓)
+                </button>
+              </div>
+
+              <div className="inline-flex rounded-xl border border-white/15 bg-slate-900 p-1">
+                {[
+                  { id: 'ALL', label: 'Todos' },
+                  { id: 'COMERCIAL', label: 'Comercial (Inventario)' },
+                  { id: 'CALIDAD', label: 'Calidad (Planta)' },
+                ].map((cat) => (
                   <button
+                    key={cat.id}
                     type="button"
-                    onClick={() => setEscalafonOrder('ASC')}
-                    className={`inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold transition-all whitespace-nowrap ${
-                      escalafonOrder === 'ASC'
-                        ? 'bg-emerald-600 text-white shadow-sm'
+                    onClick={() =>
+                      setEscalafonCategory(
+                        cat.id as 'ALL' | 'COMERCIAL' | 'CALIDAD'
+                      )
+                    }
+                    className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all whitespace-nowrap ${
+                      escalafonCategory === cat.id
+                        ? 'bg-amber-500 text-slate-950 font-bold'
                         : 'text-slate-300 hover:text-white'
                     }`}
                   >
-                    <ArrowUpDown className="h-3.5 w-3.5" />
-                    De Menor a Mayor (↑)
+                    {cat.label}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setEscalafonOrder('DESC')}
-                    className={`inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold transition-all whitespace-nowrap ${
-                      escalafonOrder === 'DESC'
-                        ? 'bg-indigo-600 text-white shadow-sm'
-                        : 'text-slate-300 hover:text-white'
-                    }`}
-                  >
-                    <ArrowUpDown className="h-3.5 w-3.5" />
-                    De Mayor a Menor (↓)
-                  </button>
-                </div>
-
-                <div className="inline-flex rounded-xl border border-white/15 bg-slate-900 p-1">
-                  {[
-                    { id: 'ALL', label: 'Todos' },
-                    { id: 'COMERCIAL', label: 'Comercial (Inventario)' },
-                    { id: 'CALIDAD', label: 'Calidad (Planta)' },
-                  ].map((cat) => (
-                    <button
-                      key={cat.id}
-                      type="button"
-                      onClick={() =>
-                        setEscalafonCategory(
-                          cat.id as 'ALL' | 'COMERCIAL' | 'CALIDAD'
-                        )
-                      }
-                      className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all whitespace-nowrap ${
-                        escalafonCategory === cat.id
-                          ? 'bg-amber-500 text-slate-950 font-bold'
-                          : 'text-slate-300 hover:text-white'
-                      }`}
-                    >
-                      {cat.label}
-                    </button>
-                  ))}
-                </div>
+                ))}
               </div>
 
               {onOpenExecutiveReport && (

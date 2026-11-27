@@ -732,46 +732,44 @@ export const ProductionEngineeringView: React.FC<
     <div className="space-y-6">
       {/* Top Executive Header */}
       <div className="rounded-3xl border border-white/20 bg-slate-950/90 p-4 sm:p-5 shadow-2xl">
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-wrap items-center justify-between gap-2.5">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="quality" dot className="whitespace-nowrap">
-                Informe Ejecutivo · Ingeniería de Calidad & Planta
-              </Badge>
-              <span className="rounded-full bg-violet-500/15 border border-violet-500/30 px-3 py-0.5 text-xs font-medium text-violet-300 whitespace-nowrap">
-                Análisis Automático por Producto, Causa y Lote
-              </span>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2 shrink-0">
-              {onOpenExcelModal && (
-                <button
-                  type="button"
-                  onClick={onOpenExcelModal}
-                  className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 px-3.5 py-2 text-xs font-bold text-white shadow-lg shadow-emerald-600/20 transition-all whitespace-nowrap"
-                >
-                  <FileSpreadsheet className="h-4 w-4 shrink-0" />
-                  Actualizar desde Excel (.xlsx)
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={handleExportQualityCSV}
-                className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-slate-900 hover:bg-slate-800 px-3.5 py-2 text-xs font-semibold text-white transition-all whitespace-nowrap"
-              >
-                <Download className="h-4 w-4 text-sky-400 shrink-0" />
-                Descargar Informe Calidad (Excel)
-              </button>
-            </div>
+        <div className="flex flex-col items-center text-center gap-2.5">
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <Badge variant="quality" dot className="whitespace-nowrap">
+              Informe Ejecutivo · Ingeniería de Calidad & Planta
+            </Badge>
+            <span className="rounded-full bg-violet-500/15 border border-violet-500/30 px-3 py-0.5 text-xs font-medium text-violet-300 whitespace-nowrap">
+              Análisis Automático por Producto, Causa y Lote
+            </span>
           </div>
 
           <div>
             <h1 className="text-lg sm:text-2xl font-bold tracking-tight text-white">
               Diagnóstico de Calidad por Producto, Lotes Críticos y Causales
             </h1>
-            <p className="mt-0.5 text-xs sm:text-sm text-slate-300 leading-relaxed">
+            <p className="mt-0.5 text-xs sm:text-sm text-slate-300 leading-relaxed max-w-3xl mx-auto">
               Reporte consolidado directo desde el Excel de devoluciones. Identifica qué productos y <strong>Lotes</strong> presentan mayor incidencia por <strong>Lechosidad</strong>, <strong>Pérdida de Vacío</strong> o <strong>Rotación Comercial</strong>.
             </p>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-center gap-2.5 pt-1">
+            {onOpenExcelModal && (
+              <button
+                type="button"
+                onClick={onOpenExcelModal}
+                className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 px-3.5 py-2 text-xs font-bold text-white shadow-lg shadow-emerald-600/20 transition-all whitespace-nowrap"
+              >
+                <FileSpreadsheet className="h-4 w-4 shrink-0" />
+                Actualizar desde Excel (.xlsx)
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleExportQualityCSV}
+              className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-slate-900 hover:bg-slate-800 px-3.5 py-2 text-xs font-semibold text-white transition-all whitespace-nowrap"
+            >
+              <Download className="h-4 w-4 text-sky-400 shrink-0" />
+              Descargar Informe Calidad (Excel)
+            </button>
           </div>
         </div>
 
