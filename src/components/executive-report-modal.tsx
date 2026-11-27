@@ -390,8 +390,8 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
         <title>Informe Gerencial Cardiso - ${maxDate}</title>
         <style>
           @page {
-            size: A4 landscape;
-            margin: 4mm;
+            size: landscape;
+            margin: 5mm;
           }
           * {
             box-sizing: border-box;
@@ -406,13 +406,33 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
             height: 100%;
             background: #ffffff;
             color: #0f172a;
-            overflow: hidden;
+          }
+          .print-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            background: #0f172a;
+            color: #ffffff;
+            padding: 8px 16px;
+            margin-bottom: 6px;
+            border-radius: 8px;
+            font-size: 12px;
+          }
+          .print-btn {
+            background: #10b981;
+            color: #022c22;
+            border: none;
+            border-radius: 6px;
+            padding: 6px 14px;
+            font-weight: 800;
+            font-size: 12px;
+            cursor: pointer;
           }
           .sheet {
             width: 100%;
             max-width: 100%;
-            height: 95vh;
-            max-height: 95vh;
+            min-height: 185mm;
             border: 2px solid #94a3b8;
             border-radius: 10px;
             padding: 7px 10px;
@@ -422,6 +442,26 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
             gap: 5px;
             page-break-inside: avoid;
             break-inside: avoid;
+          }
+          @media print {
+            @page {
+              size: landscape;
+              margin: 4mm;
+            }
+            html, body {
+              width: 100% !important;
+              height: auto !important;
+              overflow: visible !important;
+            }
+            .print-toolbar {
+              display: none !important;
+            }
+            .sheet {
+              width: 100% !important;
+              height: 95vh !important;
+              max-height: 95vh !important;
+              min-height: 0 !important;
+            }
           }
           .header {
             display: flex;
@@ -612,6 +652,10 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
         </style>
       </head>
       <body>
+        <div class="print-toolbar">
+          <span>📄 <strong>Vista Oficial de Impresión Horizontal (1 Sola Hoja)</strong> — Compatible con Carta y A4 Horizontal</span>
+          <button class="print-btn" onclick="window.print()">🖨️ Imprimir / Guardar PDF Horizontal</button>
+        </div>
         <div class="sheet">
           <div class="header">
             <div class="header-left">

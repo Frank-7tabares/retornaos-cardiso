@@ -39,3 +39,20 @@
     linear-gradient(to right, rgba(120, 120, 128, 0.06) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(120, 120, 128, 0.06) 1px, transparent 1px);
 }
+
+/* Global Print Rules: Force Landscape orientation on any paper size (Letter or A4) */
+@page {
+  size: landscape;
+  margin: 5mm;
+}
+
+@media print {
+  @page {
+    size: landscape;
+    margin: 5mm;
+  }
+  html, body {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
