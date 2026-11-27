@@ -77,6 +77,7 @@ export const ProductionEngineeringView: React.FC<
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'MATRIX' | 'DETAIL'>('MATRIX');
   const [chartBarMode, setChartBarMode] = useState<'LOTS' | 'DATES'>('LOTS');
+  const [semaforoArea, setSemaforoArea] = useState<'CALIDAD' | 'COMERCIAL'>('CALIDAD');
   const [detailLimit, setDetailLimit] = useState<number>(100);
   const semaforoScrollRef = useRef<HTMLDivElement | null>(null);
 
@@ -94,6 +95,13 @@ export const ProductionEngineeringView: React.FC<
     causeFilter === 'proxVencer' ||
     causeFilter === 'vencido' ||
     causeFilter === 'aCobrar';
+
+  const effectiveSemaforoArea: 'CALIDAD' | 'COMERCIAL' =
+    !showCalidadGroup && showComercialGroup
+      ? 'COMERCIAL'
+      : showCalidadGroup && !showComercialGroup
+      ? 'CALIDAD'
+      : semaforoArea;
 
   const scrollSemaforo = (dir: 'LEFT' | 'RIGHT') => {
     const el = semaforoScrollRef.current;
@@ -644,17 +652,43 @@ export const ProductionEngineeringView: React.FC<
     });
   }, [allProductsMatrix, selectedProductFilter, searchQuery]);
 
-  // Semáforo de Productos: incluye TODOS los productos (sin límite de 4) con scroll horizontal a la derecha y los mismos datos exactos de la tabla
+  // Semáforo de Productos: ordenado por unidades según el filtro activo (Calidad o Comercial)
   const topQualityAlerts = useMemo(() => {
-    return allProductsMatrix.map((prod) => {
+    const filteredList = allProductsMatrix.filter((prod) =>
+      effectiveSemaforoArea === 'CALIDAD'
+        ? prod.qualityUnits > 0
+        : prod.commercialUnits > 0
+    );
+
+    const sortedByArea = [...filteredList].sort((a, b) => {
+      if (effectiveSemaforoArea === 'CALIDAD') {
+        return (
+          b.qualityUnits - a.qualityUnits ||
+          b.qualityCOP - a.qualityCOP ||
+          a.productName.localeCompare(b.productName)
+        );
+      }
+      return (
+        b.commercialUnits - a.commercialUnits ||
+        b.commercialCOP - a.commercialCOP ||
+        a.productName.localeCompare(b.productName)
+      );
+    });
+
+    return sortedByArea.map((prod) => {
       const sortedLots = Array.from(prod.lotsMap.values())
-        .filter((l) => l.totalUnits > 0)
-        .sort((a, b) => b.totalUnits - a.totalUnits)
-        .slice(0, 5)
-        .map((l) => ({
-          lot: l.lot,
-          units: l.totalUnits,
-        }));
+        .map((l) => {
+          const qualLotUnits = l.lechozo + l.vacio + l.xFecha + l.abomba;
+          const commLotUnits = Math.max(0, l.totalUnits - qualLotUnits);
+          return {
+            lot: l.lot,
+            units:
+              effectiveSemaforoArea === 'CALIDAD' ? qualLotUnits : commLotUnits,
+          };
+        })
+        .filter((l) => l.units > 0)
+        .sort((a, b) => b.units - a.units)
+        .slice(0, 5);
 
       return {
         productName: prod.productName,
@@ -668,7 +702,7 @@ export const ProductionEngineeringView: React.FC<
         topLots: sortedLots,
       };
     });
-  }, [allProductsMatrix]);
+  }, [allProductsMatrix, effectiveSemaforoArea]);
 
   const handleExportQualityCSV = () => {
     const headers = [
@@ -898,27 +932,66 @@ export const ProductionEngineeringView: React.FC<
         </div>
       </div>
 
-      {/* Radar of Critical Products & Lots (Semáforo de Productos con Scroll Horizontal y sincronizado 100% con el filtro y la Tabla) */}
-      {topQualityAlerts.length > 0 && (
+      {/* Radar of Critical Products & Lots (Semáforo de Productos con 2 filtros: Calidad y Comercial, ordenado por unidades) */}
+      {(allProductsMatrix.length > 0 || topQualityAlerts.length > 0) && (
         <div className="rounded-3xl border border-violet-500/30 bg-slate-950/85 backdrop-blur-2xl p-4 sm:p-6 shadow-xl">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
             <div>
               <div className="flex items-center gap-2">
                 <ShieldAlert className="h-5 w-5 text-violet-400" />
                 <h2 className="text-sm sm:text-base font-bold text-white">
-                  Semáforo de Productos ({topQualityAlerts.length} Productos — Desliza a la derecha ▶)
+                  Semáforo de Productos ({topQualityAlerts.length} Productos — Ordenado por Unidades de{' '}
+                  {effectiveSemaforoArea === 'CALIDAD' ? 'Calidad' : 'Comercial'} ▶)
                 </h2>
               </div>
               <p className="text-xs text-emerald-300 font-medium mt-0.5">
-                {showCalidadGroup && showComercialGroup
-                  ? 'Mostrando Calidad (Planta) + Comercial (Ventas) = Total Devuelto'
-                  : showCalidadGroup
-                  ? 'Filtro Activo: Mostrando SOLO Calidad (Planta) sin Comercial'
-                  : 'Filtro Activo: Mostrando SOLO Comercial (Ventas) sin Planta'}
+                {effectiveSemaforoArea === 'CALIDAD'
+                  ? 'Filtro Activo: Ordenado de Mayor a Menor Unidades por CALIDAD (Planta: Vacío · Lechosidad · X Fecha · Embomb.)'
+                  : 'Filtro Activo: Ordenado de Mayor a Menor Unidades por COMERCIAL (Ventas: Próximo · Vencido · X Cobrar)'}
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Selector de 2 Filtros: Calidad vs Comercial */}
+              <div className="inline-flex rounded-xl border border-white/15 bg-slate-900 p-1 text-xs">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSemaforoArea('CALIDAD');
+                    if (!showCalidadGroup) setCauseFilter('ALL');
+                    semaforoScrollRef.current?.scrollTo({
+                      left: 0,
+                      behavior: 'smooth',
+                    });
+                  }}
+                  className={`rounded-lg px-3 py-1.5 font-bold transition-all whitespace-nowrap ${
+                    effectiveSemaforoArea === 'CALIDAD'
+                      ? 'bg-sky-500 text-slate-950 shadow-sm'
+                      : 'text-sky-300 hover:text-white'
+                  }`}
+                >
+                  🔵 Calidad (Planta)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSemaforoArea('COMERCIAL');
+                    if (!showComercialGroup) setCauseFilter('ALL');
+                    semaforoScrollRef.current?.scrollTo({
+                      left: 0,
+                      behavior: 'smooth',
+                    });
+                  }}
+                  className={`rounded-lg px-3 py-1.5 font-bold transition-all whitespace-nowrap ${
+                    effectiveSemaforoArea === 'COMERCIAL'
+                      ? 'bg-amber-500 text-slate-950 shadow-sm'
+                      : 'text-amber-300 hover:text-white'
+                  }`}
+                >
+                  🟠 Comercial (Ventas)
+                </button>
+              </div>
+
               <button
                 type="button"
                 onClick={() => scrollSemaforo('LEFT')}
@@ -944,99 +1017,138 @@ export const ProductionEngineeringView: React.FC<
             ref={semaforoScrollRef}
             className="flex gap-3.5 overflow-x-auto pb-3 snap-x snap-mandatory scroll-smooth"
           >
-            {topQualityAlerts.map((alert, idx) => (
-              <div
-                key={alert.productName}
-                onClick={() =>
-                  setSelectedProductFilter(
+            {topQualityAlerts.map((alert, idx) => {
+              const activeUnits =
+                effectiveSemaforoArea === 'CALIDAD'
+                  ? alert.qualityUnits
+                  : alert.commercialUnits;
+              const activeCOP =
+                effectiveSemaforoArea === 'CALIDAD'
+                  ? alert.qualityCOP
+                  : alert.commercialCOP;
+
+              return (
+                <div
+                  key={alert.productName}
+                  onClick={() =>
+                    setSelectedProductFilter(
+                      selectedProductFilter === alert.productName
+                        ? 'ALL'
+                        : alert.productName
+                    )
+                  }
+                  className={`min-w-[285px] sm:min-w-[310px] max-w-[325px] shrink-0 snap-start cursor-pointer rounded-2xl border p-4 transition-all ${
                     selectedProductFilter === alert.productName
-                      ? 'ALL'
-                      : alert.productName
-                  )
-                }
-                className={`min-w-[285px] sm:min-w-[310px] max-w-[325px] shrink-0 snap-start cursor-pointer rounded-2xl border p-4 transition-all ${
-                  selectedProductFilter === alert.productName
-                    ? 'border-violet-400 bg-violet-950/50 shadow-lg shadow-violet-500/20'
-                    : 'border-white/15 bg-slate-900/80 hover:border-violet-400/50'
-                }`}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="inline-flex items-center gap-1 rounded-lg bg-rose-500/20 border border-rose-500/30 px-2 py-0.5 text-[10px] font-bold text-rose-300">
-                    #{idx + 1} de {topQualityAlerts.length}
-                  </span>
-                  <span className="font-mono text-xs font-extrabold text-white">
-                    Total: {formatNumber(alert.totalUnits)} und ({formatCOP(alert.totalCOP)})
-                  </span>
+                      ? 'border-violet-400 bg-violet-950/50 shadow-lg shadow-violet-500/20'
+                      : 'border-white/15 bg-slate-900/80 hover:border-violet-400/50'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span
+                      className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[10px] font-bold border ${
+                        effectiveSemaforoArea === 'CALIDAD'
+                          ? 'bg-sky-500/20 border-sky-500/35 text-sky-300'
+                          : 'bg-amber-500/20 border-amber-500/35 text-amber-300'
+                      }`}
+                    >
+                      #{idx + 1} de {topQualityAlerts.length}
+                    </span>
+                    <span className="font-mono text-xs font-extrabold text-white">
+                      {formatNumber(activeUnits)} und ({formatCOP(activeCOP)})
+                    </span>
+                  </div>
+
+                  <h3
+                    className="mt-2 text-sm font-bold text-white leading-snug truncate"
+                    title={alert.productName}
+                  >
+                    {alert.productName}
+                  </h3>
+
+                  {/* Desglose Exacto según el filtro seleccionado: Calidad o Comercial */}
+                  {effectiveSemaforoArea === 'CALIDAD' ? (
+                    <div className="mt-2.5 rounded-xl border border-sky-500/30 bg-sky-950/35 p-2.5 space-y-1.5">
+                      <div className="flex items-center justify-between text-[11px] font-bold text-sky-300">
+                        <span>CALIDAD (Producción):</span>
+                        <span className="font-mono">
+                          {formatNumber(alert.qualityUnits)} und ·{' '}
+                          {formatCOP(alert.qualityCOP)}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-1.5 text-[11px] font-mono text-slate-200">
+                        <span>
+                          • Vacío: <strong>{alert.causes.vacio}</strong>
+                        </span>
+                        <span>
+                          • Lechosidad: <strong>{alert.causes.lechozo}</strong>
+                        </span>
+                        <span>
+                          • X Fecha: <strong>{alert.causes.xFecha}</strong>
+                        </span>
+                        <span>
+                          • Embomb.: <strong>{alert.causes.abomba}</strong>
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-2.5 rounded-xl border border-amber-500/30 bg-amber-950/30 p-2.5 space-y-1.5">
+                      <div className="flex items-center justify-between text-[11px] font-bold text-amber-300">
+                        <span>COMERCIAL (Ventas):</span>
+                        <span className="font-mono">
+                          {formatNumber(alert.commercialUnits)} und ·{' '}
+                          {formatCOP(alert.commercialCOP)}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-1.5 text-[11px] font-mono text-slate-200">
+                        <span>
+                          • Próx: <strong>{alert.causes.proxVencer}</strong>
+                        </span>
+                        <span>
+                          • Venc: <strong>{alert.causes.vencido}</strong>
+                        </span>
+                        <span>
+                          • Cobrar: <strong>{alert.causes.aCobrar}</strong>
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Lots involved for the selected area */}
+                  <div className="mt-2.5 pt-2 border-t border-white/10">
+                    <div className="text-[10px] uppercase tracking-wider text-slate-400 mb-1.5">
+                      Lotes afectados ({effectiveSemaforoArea === 'CALIDAD' ? 'Calidad' : 'Comercial'}):
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {alert.topLots.length > 0 ? (
+                        alert.topLots.map((l) => (
+                          <button
+                            key={l.lot}
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedLotFilter(
+                                selectedLotFilter === l.lot ? 'ALL' : l.lot
+                              );
+                            }}
+                            className={`rounded-lg px-2 py-0.5 font-mono text-[10px] font-bold border transition-all ${
+                              selectedLotFilter === l.lot
+                                ? 'bg-emerald-500 text-slate-950 border-emerald-300'
+                                : 'bg-slate-950 text-emerald-300 border-emerald-500/30 hover:border-emerald-400'
+                            }`}
+                          >
+                            L-{l.lot} ({l.units}u)
+                          </button>
+                        ))
+                      ) : (
+                        <span className="text-[11px] text-slate-500">
+                          Sin lote
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
-
-                <h3 className="mt-2 text-sm font-bold text-white leading-snug truncate" title={alert.productName}>
-                  {alert.productName}
-                </h3>
-
-                {/* Desglose Exacto Calidad (Producción) — Solo se muestra si el filtro incluye Calidad */}
-                {showCalidadGroup && (
-                  <div className="mt-2.5 rounded-xl border border-sky-500/25 bg-sky-950/30 p-2 space-y-1">
-                    <div className="flex items-center justify-between text-[11px] font-bold text-sky-300">
-                      <span>CALIDAD (Producción):</span>
-                      <span className="font-mono">{alert.qualityUnits} und · {formatCOP(alert.qualityCOP)}</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-1 text-[10px] font-mono text-slate-200">
-                      <span>• Vacío: <strong>{alert.causes.vacio}</strong></span>
-                      <span>• Lechosidad: <strong>{alert.causes.lechozo}</strong></span>
-                      <span>• X Fecha: <strong>{alert.causes.xFecha}</strong></span>
-                      <span>• Embomb.: <strong>{alert.causes.abomba}</strong></span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Desglose Exacto Comercial (Ventas) — Solo se muestra si el filtro incluye Comercial */}
-                {showComercialGroup && (
-                  <div className="mt-2 rounded-xl border border-amber-500/25 bg-amber-950/25 p-2 space-y-1">
-                    <div className="flex items-center justify-between text-[11px] font-bold text-amber-300">
-                      <span>COMERCIAL (Ventas):</span>
-                      <span className="font-mono">{alert.commercialUnits} und · {formatCOP(alert.commercialCOP)}</span>
-                    </div>
-                    <div className="grid grid-cols-3 gap-1 text-[10px] font-mono text-slate-200">
-                      <span>• Próx: <strong>{alert.causes.proxVencer}</strong></span>
-                      <span>• Venc: <strong>{alert.causes.vencido}</strong></span>
-                      <span>• Cobrar: <strong>{alert.causes.aCobrar}</strong></span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Lots involved (Exact same filtered lot units as in the Table) */}
-                <div className="mt-2.5 pt-2 border-t border-white/10">
-                  <div className="text-[10px] uppercase tracking-wider text-slate-400 mb-1.5">
-                    Lotes afectados (mismos de la tabla):
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {alert.topLots.length > 0 ? (
-                      alert.topLots.map((l) => (
-                        <button
-                          key={l.lot}
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedLotFilter(
-                              selectedLotFilter === l.lot ? 'ALL' : l.lot
-                            );
-                          }}
-                          className={`rounded-lg px-2 py-0.5 font-mono text-[10px] font-bold border transition-all ${
-                            selectedLotFilter === l.lot
-                              ? 'bg-emerald-500 text-slate-950 border-emerald-300'
-                              : 'bg-slate-950 text-emerald-300 border-emerald-500/30 hover:border-emerald-400'
-                          }`}
-                        >
-                          L-{l.lot} ({l.units}u)
-                        </button>
-                      ))
-                    ) : (
-                      <span className="text-[11px] text-slate-500">Sin lote</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
